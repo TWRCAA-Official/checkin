@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#000000">
+<title>團體報到掃描</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root {
+    --bg: #000; --ink: #fff; --muted: #a8a8a8; --field: #1f1f1f; --line: #3a3a3a;
+    --ok: #008026; --dup: #ff8c00; --bad: #e40303;
+    --font: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: var(--font); }
+  body { padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0); }
+  main { max-width: 480px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 30px; font-weight: 900; margin: 12px 0 24px; }
+  label { display: block; font-size: 15px; font-weight: 700; margin: 0 0 8px; }
+  input {
+    width: 100%; font: inherit; font-size: 18px; padding: 14px 16px; margin: 0 0 18px;
+    border: 2px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink);
+  }
+  input:focus { outline: none; border-color: var(--ink); }
+  button {
+    font: inherit; font-size: 18px; font-weight: 700; padding: 15px 18px;
+    border: 0; border-radius: 10px; background: var(--ink); color: #000; cursor: pointer;
+  }
+  button:disabled { opacity: .5; }
+  button.wide { width: 100%; }
+  button:focus-visible { outline: 3px solid #4d7cff; outline-offset: 3px; }
+  .err { color: #ff6b6b; font-weight: 500; min-height: 1.2em; margin: -4px 0 16px; }
+  .pending { color: var(--ink); background: var(--field); border-radius: 10px; padding: 12px 14px; margin: 0 0 18px; line-height: 1.6; }
+
+  .bar { display: flex; justify-content: space-between; align-items: baseline; margin: 4px 0 14px; }
+  .bar .station { font-size: 16px; color: var(--muted); }
+  .bar .count { font-size: 22px; font-weight: 900; }
+  .bar .count small { font-size: 15px; font-weight: 500; color: var(--muted); }
+  .bar .count.stale { opacity: .5; }
+  #reader { width: 100%; border-radius: 14px; overflow: hidden; background: #111; min-height: 280px; }
+  #reader video { border-radius: 14px; }
+  .camErr { color: var(--muted); line-height: 1.7; padding: 16px 4px; }
+  .snap { display: block; text-align: center; margin: 14px 0 0; padding: 18px; border-radius: 12px; background: var(--ink); color: #000; font-size: 20px; font-weight: 900; cursor: pointer; }
+  .manual { display: flex; gap: 10px; margin-top: 16px; }
+  .manual input { margin: 0; text-transform: uppercase; letter-spacing: .08em; }
+  .manual button { flex: none; }
+  .logout { background: transparent; color: var(--muted); font-size: 15px; font-weight: 500; padding: 14px 0; }
+
+  /* 結果覆蓋層 */
+  #overlay {
+    position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center;
+    padding: calc(env(safe-area-inset-top, 0px) + 28px) 28px calc(env(safe-area-inset-bottom, 0px) + 28px);
+    text-align: center; cursor: pointer;
+  }
+  #overlay.wait { background: rgba(0, 0, 0, .85); cursor: default; }
+  #overlay.ok { background: var(--ok); }
+  #overlay.dup { background: var(--dup); color: #000; }
+  #overlay.bad { background: var(--bad); }
+  #overlay.retry { cursor: default; }
+  #oTitle { font-size: 44px; font-weight: 900; margin: 0 0 18px; }
+  #oTeam { font-size: 20px; font-weight: 700; margin: 0 0 6px; opacity: .9; }
+  #oName { font-size: 30px; font-weight: 700; line-height: 1.35; margin: 0 0 14px; word-break: break-word; }
+  #oMeta { font-size: 18px; font-weight: 500; opacity: .85; margin: 0; line-height: 1.6; }
+  #oHint { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); font-size: 15px; opacity: .7; }
+  .oActions { display: flex; flex-direction: column; gap: 12px; margin: 28px auto 0; width: 100%; max-width: 360px; }
+  .oActions button { width: 100%; font-size: 22px; font-weight: 900; padding: 18px; }
+  .oActions .ghost { background: transparent; color: var(--ink); border: 2px solid rgba(255, 255, 255, .7); font-size: 18px; font-weight: 700; padding: 14px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <section id="loginView">
+    <p style="color:var(--muted);margin:0" id="eventName"></p>
+    <h1>團體報到掃描</h1>
+    <p class="pending" id="pendingNote" hidden></p>
+    <label for="pin">工作人員密碼</label>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off">
+    <label for="staff">你的名字</label>
+    <input id="staff" placeholder="會記錄在報到紀錄中">
+    <p class="err" id="loginErr" role="alert"></p>
+    <button class="wide" id="loginBtn">開始掃描</button>
+  </section>
+
+  <section id="scanView" hidden>
+    <div class="bar">
+      <span class="station" id="stationLabel"></span>
+      <span class="count" id="count">– <small>/ –</small></span>
+    </div>
+    <div id="reader"></div>
+    <p class="camErr" id="camErr" hidden>這個瀏覽器無法直接開啟即時鏡頭，請點下方「拍照掃描」，或手動輸入團體代碼。</p>
+    <label class="snap" for="snapInput">拍照掃描</label>
+    <input id="snapInput" type="file" accept="image/*" capture="environment" hidden>
+    <div id="fileReader" hidden></div>
+    <div class="manual">
+      <input id="manualCode" placeholder="輸入團體代碼" autocapitalize="characters" autocomplete="off">
+      <button id="manualBtn">報到</button>
+    </div>
+    <button class="logout" id="logout">登出</button>
+  </section>
+</main>
+
+<div id="overlay" hidden role="alert">
+  <p id="oTitle"></p>
+  <p id="oTeam"></p>
+  <p id="oName"></p>
+  <p id="oMeta"></p>
+  <div class="oActions" id="oActions" hidden>
+    <button id="retryBtn">重送</button>
+    <button class="ghost" id="skipBtn">略過，繼續掃描</button>
+  </div>
+  <p id="oHint">點一下繼續掃描</p>
+</div>
+
+<script>
+  /* ---------- 設定 ---------- */
+  const CONFIG = {
+    // Apps Script 網頁應用程式網址（部署時「誰可以存取」須為「所有人」）
+    API_URL: 'https://script.google.com/a/macros/taiwanpride.lgbt/s/AKfycbzTg5AkU6ncqeVfDms1YcrKmoi9ua_BGdwR8tYmWsFn-WBXfwph0lg_HMM73UM7ePXL/exec',
+    EVENT_NAME: '第 24 屆臺灣同志遊行',
+    DEDUPE_MS: 4000,        // 同一個代碼多久內不重複送出
+    TIMEOUT_MS: 25000,      // 單次請求逾時（伺服器端鎖最多等 15 秒）
+    STATS_SECONDS: 30,
+  };
+
+  const $ = id => document.getElementById(id);
+  const KEY = 'twpride_checkin_staff';
+  let session = null, scanner = null, busy = false, lastCode = '', lastAt = 0, hideTimer = null;
+  let retryCode = '', wakeLock = null;
+
+  const store = {
+    get() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } },
+    set(v) { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) {} },
+    clear() { try { localStorage.removeItem(KEY); } catch (e) {} },
+  };
+
+  /* ---------- 代碼解析：新網址 ?code=、舊網址 ?page=scan&code=、純代碼 ---------- */
+  function parseCode(raw) {
+    const s = String(raw || '').trim();
+    const m = s.match(/[?&]code=([^&#]+)/);
+    let v = m ? m[1] : s;
+    try { v = decodeURIComponent(v); } catch (e) {}
+    return v.trim().toUpperCase();
+  }
+
+  /* ---------- Apps Script API ---------- */
+  async function api(action, data) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), CONFIG.TIMEOUT_MS);
+    try {
+      const res = await fetch(CONFIG.API_URL, {
+        method: 'POST',
+        // text/plain 不會觸發 CORS 預檢
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(Object.assign({ action }, data)),
+        redirect: 'follow',
+        signal: ctrl.signal,
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.json();
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  /* ---------- 登入 ---------- */
+  async function login(s, fromSaved) {
+    $('loginBtn').disabled = true;
+    $('loginErr').textContent = '';
+    let r;
+    try {
+      r = await api('verifyPin', { pin: s.pin });
+    } catch (e) {
+      $('loginBtn').disabled = false;
+      $('loginErr').textContent = '連線失敗，請確認網路後再按一次「開始掃描」。';
+      return;
+    }
+    $('loginBtn').disabled = false;
+    if (r.error) {
+      $('loginErr').textContent = '系統讀取失敗，請稍後再按一次「開始掃描」。';
+      return;
+    }
+    if (!r.ok) {
+      store.clear();
+      if (!fromSaved) $('loginErr').textContent = '密碼不正確。';
+      return;
+    }
+    session = s;
+    store.set(s);
+    $('loginView').hidden = true;
+    $('scanView').hidden = false;
+    $('stationLabel').textContent = s.staff ? '經手人：' + s.staff : '';
+    refreshStats();
+    keepAwake();
+    startCamera();
+    const pre = takeUrlCode();
+    if (pre) submit(pre);
+  }
+
+  // 用手機內建相機掃描時，會帶著 ?code= 開啟這頁
+  let urlCode = parseCode(new URLSearchParams(location.search).get('code') || '');
+  function takeUrlCode() {
+    const c = urlCode;
+    urlCode = '';
+    if (c) { try { history.replaceState(null, '', location.pathname); } catch (e) {} }
+    $('pendingNote').hidden = true;
+    return c;
+  }
+
+  /* ---------- 鏡頭 ---------- */
+  function startCamera() {
+    if (scanner) return;
+    try {
+      scanner = new Html5Qrcode('reader', {
+        verbose: false,
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+      });
+      scanner.start(
+        { facingMode: 'environment' },
+        { fps: 12, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.7); return { width: s, height: s }; } },
+        onScan,
+        () => {}
+      ).then(() => { $('camErr').hidden = true; $('reader').hidden = false; }).catch(camFail);
+    } catch (e) { camFail(); }
+  }
+
+  function onScan(text) {
+    const code = parseCode(text);
+    const now = Date.now();
+    if (busy || !code || (code === lastCode && now - lastAt < CONFIG.DEDUPE_MS)) return;
+    lastCode = code; lastAt = now;
+    submit(code);
+  }
+
+  function camFail() {
+    try { scanner && scanner.clear(); } catch (e) {}
+    scanner = null;
+    $('camErr').hidden = false; $('reader').hidden = true;
+  }
+
+  // iOS 切到其他 App 再回來時，鏡頭串流可能已中斷，需要重新啟動
+  async function reviveCamera() {
+    if (!scanner || !session) return;
+    const v = document.querySelector('#reader video');
+    const track = v && v.srcObject && v.srcObject.getVideoTracks ? v.srcObject.getVideoTracks()[0] : null;
+    if (track && track.readyState === 'live') return;
+    try { await scanner.stop(); } catch (e) {}
+    try { scanner.clear(); } catch (e) {}
+    scanner = null;
+    startCamera();
+  }
+
+  function pauseCamera() { try { scanner && scanner.getState() === Html5QrcodeScannerState.SCANNING && scanner.pause(true); } catch (e) {} }
+  function resumeCamera() { try { scanner && scanner.getState() === Html5QrcodeScannerState.PAUSED && scanner.resume(); } catch (e) {} }
+
+  /* ---------- 螢幕常亮 ---------- */
+  async function keepAwake() {
+    if (!('wakeLock' in navigator) || !session || document.hidden) return;
+    if (wakeLock && !wakeLock.released) return;
+    try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* 不支援或被拒絕時略過 */ }
+  }
+
+  /* ---------- 報到 ---------- */
+  function submit(raw) {
+    const code = parseCode(raw);
+    if (busy || !session || !code) return;
+    busy = true;
+    pauseCamera();
+    send(code);
+  }
+
+  async function send(code) {
+    showWait();
+    let r;
+    try {
+      r = await api('checkIn', { pin: session.pin, code: code, staff: session.staff });
+      if (r.error) r = { result: 'error', code: code };
+    } catch (e) {
+      r = { result: 'net', code: code };
+    }
+    showResult(r);
+  }
+
+  function showWait() {
+    clearTimeout(hideTimer);
+    const o = $('overlay');
+    o.className = 'wait';
+    $('oTitle').textContent = '報到中…';
+    $('oTeam').textContent = ''; $('oName').textContent = ''; $('oMeta').textContent = '';
+    $('oActions').hidden = true; $('oHint').hidden = true;
+    o.hidden = false;
+  }
+
+  function showResult(r) {
+    const o = $('overlay');
+    o.className = '';
+    let title = '', name = '', meta = '', team = r.team || '', retry = false;
+    if (r.result === 'ok') {
+      o.classList.add('ok'); title = '✅ 報到完成'; name = r.name; meta = r.time + ' 報到　目前 ' + r.done + ' / ' + r.total;
+      setCount(r.done, r.total); buzz([120]);
+    } else if (r.result === 'dup') {
+      o.classList.add('dup'); title = '⚠️ 已報到過'; name = r.name; meta = r.time + ' 已完成報到';
+      buzz([80, 80, 80]);
+    } else if (r.result === 'pin') {
+      o.classList.add('bad'); title = '密碼已變更'; meta = '請重新登入';
+      store.clear(); setTimeout(() => location.reload(), 1500);
+    } else if (r.result === 'unread') {
+      o.classList.add('bad'); title = '讀不到 QR Code'; meta = '請靠近一點、對準 QR Code 再拍一次';
+      buzz([300]);
+    } else if (r.result === 'net' || r.result === 'error') {
+      o.classList.add('bad', 'retry');
+      title = r.result === 'net' ? '連線失敗' : '讀取失敗';
+      name = r.code || '';
+      meta = (r.result === 'net' ? '這筆報到還沒有送出成功，請確認網路後按「重送」。' : '系統忙碌，這筆報到還沒有完成，請按「重送」。')
+        + '若重送後顯示「已報到過」，代表上一次其實已成功。';
+      retry = true; retryCode = r.code || '';
+      buzz([300, 100, 300]);
+    } else {
+      o.classList.add('bad'); title = '❌ 查無此代碼'; name = r.code || ''; meta = '請確認是否為本屆的報到 QR Code';
+      buzz([300]);
+    }
+    $('oTitle').textContent = title;
+    $('oTeam').textContent = team;
+    $('oName').textContent = name;
+    $('oMeta').textContent = meta;
+    $('oActions').hidden = !retry;
+    $('oHint').hidden = retry;
+    o.hidden = false;
+    clearTimeout(hideTimer);
+    // 連線失敗時不自動關閉，避免這筆報到被默默略過
+    if (!retry) hideTimer = setTimeout(dismiss, r.result === 'ok' ? 2200 : 4000);
+  }
+
+  function dismiss() {
+    clearTimeout(hideTimer);
+    $('overlay').hidden = true;
+    retryCode = '';
+    busy = false;
+    lastAt = Date.now();   // 從恢復掃描起算，避免同一張 QR Code 還在鏡頭前又被送出
+    resumeCamera();
+  }
+
+  function buzz(p) { if (navigator.vibrate) navigator.vibrate(p); }
+  function setCount(d, t) {
+    $('count').classList.remove('stale');
+    $('count').innerHTML = d + ' <small>/ ' + t + '</small>';
+  }
+  async function refreshStats() {
+    if (!session) return;
+    try {
+      const s = await api('getStats', { pin: session.pin });
+      if (s.error) throw new Error(s.error);
+      setCount(s.done, s.total);
+    } catch (e) {
+      $('count').classList.add('stale');   // 數字變淡表示暫時無法更新
+    }
+  }
+
+  /* ---------- 事件 ---------- */
+  $('overlay').addEventListener('click', () => {
+    const c = $('overlay').classList;
+    if (c.contains('retry') || c.contains('wait')) return;
+    dismiss();
+  });
+  $('retryBtn').addEventListener('click', e => { e.stopPropagation(); if (retryCode) send(retryCode); else dismiss(); });
+  $('skipBtn').addEventListener('click', e => { e.stopPropagation(); dismiss(); });
+
+  $('loginBtn').addEventListener('click', () => {
+    const s = { pin: $('pin').value.trim(), staff: $('staff').value.trim() };
+    if (!s.pin) { $('loginErr').textContent = '請輸入工作人員密碼。'; return; }
+    login(s, false);
+  });
+  $('staff').addEventListener('keydown', e => { if (e.key === 'Enter') $('loginBtn').click(); });
+  $('manualBtn').addEventListener('click', () => {
+    const v = $('manualCode').value.trim();
+    if (!v) return;
+    $('manualCode').value = '';
+    $('manualCode').blur();
+    submit(v);
+  });
+  $('manualCode').addEventListener('keydown', e => { if (e.key === 'Enter') $('manualBtn').click(); });
+  $('snapInput').addEventListener('change', async e => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f || busy) return;
+    try {
+      const reader = new Html5Qrcode('fileReader', { verbose: false });
+      const text = await reader.scanFile(f, false);
+      submit(text);
+    } catch (err) {
+      showResult({ result: 'unread' });
+    }
+  });
+  $('logout').addEventListener('click', async () => {
+    store.clear();
+    try { wakeLock && await wakeLock.release(); } catch (e) {}
+    try { scanner && await scanner.stop(); } catch (e) {}
+    location.replace(location.pathname);
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden || !session) return;
+    keepAwake();
+    reviveCamera();
+    refreshStats();
+  });
+  setInterval(refreshStats, CONFIG.STATS_SECONDS * 1000);
+
+  /* ---------- 啟動 ---------- */
+  $('eventName').textContent = CONFIG.EVENT_NAME;
+  if (urlCode) {
+    $('pendingNote').textContent = '登入後會自動報到：' + urlCode;
+    $('pendingNote').hidden = false;
+  }
+  const saved = store.get();
+  if (saved && saved.pin) {
+    $('pin').value = saved.pin; $('staff').value = saved.staff || '';
+    login(saved, true);
+  }
+</script>
+</body>
+</html>

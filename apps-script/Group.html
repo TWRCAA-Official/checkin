@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --muted: #5f6368;
+    --line: #dcdcdc;
+    --paper: #ffffff;
+    --field: #f5f5f5;
+    --r: #e40303; --o: #ff8c00; --y: #ffed00; --g: #008026; --b: #24408e; --p: #732982;
+    --font: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); }
+  body { padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0); }
+  main { max-width: 440px; margin: 0 auto; padding: 32px 22px 48px; }
+
+  .event { font-size: 15px; font-weight: 500; color: var(--muted); margin: 0 0 6px; }
+  h1 { font-size: 40px; font-weight: 900; line-height: 1.15; margin: 0 0 28px; letter-spacing: .02em; }
+
+  label { display: block; font-size: 15px; font-weight: 700; margin: 0 0 8px; }
+  input {
+    width: 100%; font: inherit; font-size: 18px; padding: 14px 16px; margin: 0 0 20px;
+    border: 2px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink);
+  }
+  input:focus { outline: none; border-color: var(--ink); background: #fff; }
+  button {
+    width: 100%; font: inherit; font-size: 18px; font-weight: 700; padding: 16px;
+    border: 0; border-radius: 10px; background: var(--ink); color: #fff; cursor: pointer;
+  }
+  button:focus-visible { outline: 3px solid var(--b); outline-offset: 3px; }
+  button:disabled { opacity: .5; }
+  button.plain { background: transparent; color: var(--muted); font-weight: 500; font-size: 16px; margin-top: 12px; }
+  .err { color: var(--r); font-weight: 500; margin: -6px 0 18px; min-height: 1em; }
+  .note { font-size: 14px; color: var(--muted); line-height: 1.7; margin-top: 24px; }
+
+  /* 通行證 */
+  .pass { border: 2px solid var(--ink); border-radius: 18px; overflow: hidden; }
+  .stripes { display: flex; flex-direction: column; }
+  .stripes i { display: block; height: 10px; background: #e6e6e6; transition: background-color .5s ease; }
+  .stripes i:nth-child(even) { background: #d4d4d4; }
+  .pass-body { padding: 22px 22px 26px; text-align: center; }
+  .team { display: inline-block; margin: 0 0 12px; padding: 6px 16px; border-radius: 999px; font-size: 16px; font-weight: 700; color: #fff; background: var(--ink); }
+  .team.light { color: var(--ink); }
+  .group-name { font-size: 24px; font-weight: 900; line-height: 1.35; margin: 0 0 18px; word-break: break-word; }
+  #qr { display: inline-block; padding: 12px; background: #fff; border-radius: 8px; transition: opacity .4s; }
+  #qr img, #qr canvas { display: block; width: 240px; height: 240px; }
+  .code { font-size: 20px; font-weight: 700; letter-spacing: .12em; margin: 12px 0 0; }
+  .status { font-size: 17px; font-weight: 500; margin: 18px 0 0; color: var(--muted); }
+
+  .done .stripes i:nth-child(1) { background: var(--r); }
+  .done .stripes i:nth-child(2) { background: var(--o); transition-delay: .08s; }
+  .done .stripes i:nth-child(3) { background: var(--y); transition-delay: .16s; }
+  .done .stripes i:nth-child(4) { background: var(--g); transition-delay: .24s; }
+  .done .stripes i:nth-child(5) { background: var(--b); transition-delay: .32s; }
+  .done .stripes i:nth-child(6) { background: var(--p); transition-delay: .40s; }
+  .done #qr { opacity: .18; }
+  .done .status { color: var(--g); font-size: 30px; font-weight: 900; }
+  .done .status small { display: block; font-size: 16px; font-weight: 500; color: var(--muted); margin-top: 4px; }
+
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { .stripes i, #qr { transition: none !important; } }
+</style>
+</head>
+<body data-poll="<?= pollSeconds ?>">
+<main>
+  <p class="event"><?= eventName ?></p>
+
+  <section id="formView">
+    <h1>團體報到</h1>
+    <label for="name">團體名稱</label>
+    <input id="name" autocomplete="off" placeholder="請輸入報名時填寫的團體名稱">
+    <label for="email">報名 Email</label>
+    <input id="email" type="email" inputmode="email" autocomplete="email" placeholder="name@example.com">
+    <p class="err" id="err" role="alert"></p>
+    <button id="go">顯示報到 QR Code</button>
+    <p class="note">請在報到處向工作人員出示 QR Code。報到完成後，這個畫面會自動變成「已完成報到」。</p>
+  </section>
+
+  <section id="passView" hidden>
+    <div class="pass" id="pass">
+      <div class="stripes" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="pass-body">
+        <p class="team" id="gTeam" hidden></p>
+        <p class="group-name" id="gName"></p>
+        <div id="qr" aria-label="報到 QR Code"></div>
+        <p class="code" id="gCode"></p>
+        <p class="status" id="gStatus" aria-live="polite">請出示此畫面給工作人員掃描</p>
+      </div>
+    </div>
+    <p class="note">網路不穩時，也可以出示這個畫面的截圖讓工作人員掃描。</p>
+    <button class="plain" id="reset">查詢其他團體</button>
+  </section>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const POLL_MS = Math.max(5, Number(document.body.dataset.poll) || 8) * 1000;
+  const STORE = 'twpride_checkin_lookup';
+  let current = null, timer = null;
+
+  function lookup(name, email, silent) {
+    $('go').disabled = true;
+    $('err').textContent = '';
+    google.script.run
+      .withSuccessHandler(res => {
+        $('go').disabled = false;
+        if (!res.ok) {
+          if (!silent) $('err').textContent = '找不到相符的資料。請確認團體名稱與報名 Email 都和報名時填寫的一致。';
+          return;
+        }
+        try { sessionStorage.setItem(STORE, JSON.stringify({ name, email })); } catch (e) {}
+        showPass(res);
+      })
+      .withFailureHandler(() => {
+        $('go').disabled = false;
+        $('err').textContent = '連線失敗，請確認網路後再試一次。';
+      })
+      .lookupGroup(name, email);
+  }
+
+  function showPass(res) {
+    current = res;
+    $('formView').hidden = true;
+    $('passView').hidden = false;
+    $('gName').textContent = res.name;
+    setTeam(res.team);
+    $('gCode').textContent = res.code;
+    $('qr').innerHTML = '';
+    new QRCode($('qr'), { text: res.qrText, width: 480, height: 480, correctLevel: QRCode.CorrectLevel.M });
+    setDone(res.done, res.time);
+    if (!res.done) schedule();
+  }
+
+  const TEAM_COLORS = [[/紅|red/i, '--r'], [/橙|橘|orange/i, '--o'], [/黃|yellow/i, '--y'], [/綠|green/i, '--g'], [/藍|blue/i, '--b'], [/紫|purple/i, '--p']];
+  function setTeam(team) {
+    const el = $('gTeam');
+    el.hidden = !team;
+    if (!team) return;
+    el.textContent = team;
+    const hit = TEAM_COLORS.find(t => t[0].test(team));
+    el.style.background = hit ? 'var(' + hit[1] + ')' : 'var(--ink)';
+    el.classList.toggle('light', !!hit && hit[1] === '--y');
+  }
+
+  function setDone(done, time) {
+    $('pass').classList.toggle('done', !!done);
+    $('gStatus').innerHTML = done
+      ? '已完成報到' + (time ? '<small>報到時間 ' + time + '</small>' : '')
+      : '請出示此畫面給工作人員掃描';
+  }
+
+  function schedule() {
+    clearTimeout(timer);
+    timer = setTimeout(poll, POLL_MS);
+  }
+
+  function poll() {
+    if (!current) return;
+    if (document.hidden) { schedule(); return; }
+    google.script.run
+      .withSuccessHandler(s => {
+        if (s.done) { setDone(true, s.time); if (navigator.vibrate) navigator.vibrate(200); }
+        else schedule();
+      })
+      .withFailureHandler(schedule)
+      .getStatus(current.code);
+  }
+
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && current && !$('pass').classList.contains('done')) poll(); });
+
+  $('go').addEventListener('click', () => {
+    const name = $('name').value.trim(), email = $('email').value.trim();
+    if (!name || !email) { $('err').textContent = '請填寫團體名稱與報名 Email。'; return; }
+    lookup(name, email, false);
+  });
+  $('email').addEventListener('keydown', e => { if (e.key === 'Enter') $('go').click(); });
+
+  $('reset').addEventListener('click', () => {
+    clearTimeout(timer);
+    current = null;
+    try { sessionStorage.removeItem(STORE); } catch (e) {}
+    $('passView').hidden = true;
+    $('formView').hidden = false;
+  });
+
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(STORE) || 'null');
+    if (saved) { $('name').value = saved.name; $('email').value = saved.email; lookup(saved.name, saved.email, true); }
+  } catch (e) {}
+</script>
+</body>
+</html>
