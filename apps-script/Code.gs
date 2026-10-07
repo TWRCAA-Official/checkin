@@ -9,7 +9,7 @@ const CONFIG = {
   SHEET_NAME: '報到名單',
   HEADERS: ['團體代碼', '團體名稱', '報名Email', '大隊', '報到狀態', '報到時間', '經手人'],
   EVENT_NAME: '第 24 屆臺灣同志遊行',
-  POLL_SECONDS: 8,        // 團體頁多久查詢一次報到狀態
+  POLL_SECONDS: 5,        // 團體頁多久查詢一次報到狀態
   DONE_LABEL: '已報到',
   TZ: 'Asia/Taipei',
   // GitHub Pages 掃描頁；QR Code 會指向「SCANNER_URL?code=團體代碼」。留空則改回 Apps Script 掃描頁。
@@ -42,6 +42,7 @@ function doPost(e) {
     switch (req.action) {
       case 'verifyPin': out = { ok: verifyPin(req.pin) }; break;
       case 'getStats':  out = getStats(req.pin); break;
+      case 'getRoster': out = getRoster(req.pin); break;
       case 'checkIn':   out = checkIn(req.pin, req.code, req.staff); break;
       default:          out = { error: 'action' };
     }
@@ -144,6 +145,12 @@ function getStats(pin) {
   return { done: rows.filter(r => r.done).length, total: rows.length };
 }
 
+// 掃描頁登入後下載名單，在手機上即時比對（不含 Email）
+function getRoster(pin) {
+  if (!checkPin_(pin)) throw new Error('PIN');
+  return { rows: loadRows_().map(r => ({ code: r.code, name: r.name, team: r.team, done: r.done, time: r.time })) };
+}
+
 function checkIn(pin, raw, staff) {
   if (!checkPin_(pin)) return { result: 'pin' };
   const code = parseCode_(raw);
@@ -153,13 +160,15 @@ function checkIn(pin, raw, staff) {
   lock.waitLock(15000);
   try {
     const sh = sheet_();
-    let hit = loadRows_().find(r => r.code === code);
+    let rows = loadRows_();
+    let hit = rows.find(r => r.code === code);
     let rowVals = hit ? sh.getRange(hit.row, 1, 1, CONFIG.HEADERS.length).getValues()[0] : null;
 
     // 快取的列號若已過期（例如排序過），重新讀取一次
     if (!hit || String(rowVals[COL.CODE]).trim().toUpperCase() !== code) {
       clearCache();
-      hit = loadRows_().find(r => r.code === code);
+      rows = loadRows_();
+      hit = rows.find(r => r.code === code);
       if (!hit) return { result: 'unknown', code: code };
       rowVals = sh.getRange(hit.row, 1, 1, CONFIG.HEADERS.length).getValues()[0];
     }
@@ -172,8 +181,9 @@ function checkIn(pin, raw, staff) {
     sh.getRange(hit.row, COL.STATUS + 1, 1, 3).setValues([[CONFIG.DONE_LABEL, now, staff || '']]);
     SpreadsheetApp.flush();
     clearCache();
-    const rows = loadRows_();
-    return { result: 'ok', name: hit.name, team: hit.team, time: fmtTime_(now), done: rows.filter(r => r.done).length, total: rows.length };
+    // 用寫入前讀到的名單計算已報到數，不必整張表重讀一次
+    const done = rows.filter(r => r.done && r.code !== code).length + 1;
+    return { result: 'ok', name: hit.name, team: hit.team, time: fmtTime_(now), done: done, total: rows.length };
   } finally {
     lock.releaseLock();
   }
