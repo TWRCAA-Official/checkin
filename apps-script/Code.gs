@@ -1,8 +1,9 @@
 /**
  * 臺灣同志遊行｜團體報到系統
- * 團體頁：網頁應用程式網址
- * 掃描頁：GitHub Pages（CONFIG.SCANNER_URL），透過 doPost JSON API 報到
- * 備援掃描頁：網頁應用程式網址 + ?page=scan
+ * 團體頁：GitHub Pages（https://twrcaa-official.github.io/checkin/）
+ * 掃描頁：GitHub Pages（CONFIG.SCANNER_URL）
+ * 兩頁都透過 doPost JSON API 呼叫這裡
+ * 備援：網頁應用程式網址（團體頁）、網頁應用程式網址 + ?page=scan（掃描頁）
  */
 
 const CONFIG = {
@@ -13,7 +14,7 @@ const CONFIG = {
   DONE_LABEL: '已報到',
   TZ: 'Asia/Taipei',
   // GitHub Pages 掃描頁；QR Code 會指向「SCANNER_URL?code=團體代碼」。留空則改回 Apps Script 掃描頁。
-  SCANNER_URL: 'https://twrcaa-official.github.io/checkin-scanner/',
+  SCANNER_URL: 'https://twrcaa-official.github.io/checkin/scan/',
 };
 const COL = { CODE: 0, NAME: 1, EMAIL: 2, TEAM: 3, STATUS: 4, TIME: 5, STAFF: 6 };
 const CACHE_KEY = 'rows_v2';
@@ -32,7 +33,7 @@ function doGet(e) {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
 }
 
-/* ---------- JSON API（給 GitHub Pages 掃描頁） ---------- */
+/* ---------- JSON API（給 GitHub Pages 團體頁與掃描頁） ---------- */
 
 // 前端以 Content-Type: text/plain 送出 JSON，避免 CORS 預檢
 function doPost(e) {
@@ -40,6 +41,8 @@ function doPost(e) {
   try {
     const req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     switch (req.action) {
+      case 'lookupGroup': out = lookupGroup(req.name, req.email); break;
+      case 'getStatus': out = getStatus(req.code); break;
       case 'verifyPin': out = { ok: verifyPin(req.pin) }; break;
       case 'getStats':  out = getStats(req.pin); break;
       case 'getRoster': out = getRoster(req.pin); break;

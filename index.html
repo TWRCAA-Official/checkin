@@ -4,181 +4,119 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#000000">
-<title>團體報到掃描</title>
+<title>團體報到 QR Code</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="config.js"></script>
 <style>
   :root {
-    --bg: #000; --ink: #fff; --muted: #a8a8a8; --field: #1f1f1f; --line: #3a3a3a;
-    --ok: #008026; --dup: #ff8c00; --bad: #e40303;
+    --ink: #1a1a1a;
+    --muted: #5f6368;
+    --line: #dcdcdc;
+    --paper: #ffffff;
+    --field: #f5f5f5;
+    --r: #e40303; --o: #ff8c00; --y: #ffed00; --g: #008026; --b: #24408e; --p: #732982;
     --font: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
-    color-scheme: dark;
+    color-scheme: light;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: var(--font); }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); }
   body { padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0); }
-  main { max-width: 480px; margin: 0 auto; padding: 20px; }
-  h1 { font-size: 30px; font-weight: 900; margin: 12px 0 24px; }
+  main { max-width: 440px; margin: 0 auto; padding: 32px 22px 48px; }
+
+  .event { font-size: 15px; font-weight: 500; color: var(--muted); margin: 0 0 6px; }
+  h1 { font-size: 40px; font-weight: 900; line-height: 1.15; margin: 0 0 28px; letter-spacing: .02em; }
+
   label { display: block; font-size: 15px; font-weight: 700; margin: 0 0 8px; }
   input {
-    width: 100%; font: inherit; font-size: 18px; padding: 14px 16px; margin: 0 0 18px;
+    width: 100%; font: inherit; font-size: 18px; padding: 14px 16px; margin: 0 0 20px;
     border: 2px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink);
   }
-  input:focus { outline: none; border-color: var(--ink); }
+  input:focus { outline: none; border-color: var(--ink); background: #fff; }
   button {
-    font: inherit; font-size: 18px; font-weight: 700; padding: 15px 18px;
-    border: 0; border-radius: 10px; background: var(--ink); color: #000; cursor: pointer;
+    width: 100%; font: inherit; font-size: 18px; font-weight: 700; padding: 16px;
+    border: 0; border-radius: 10px; background: var(--ink); color: #fff; cursor: pointer;
   }
+  button:focus-visible { outline: 3px solid var(--b); outline-offset: 3px; }
   button:disabled { opacity: .5; }
-  button.wide { width: 100%; }
-  button:focus-visible { outline: 3px solid #4d7cff; outline-offset: 3px; }
-  .err { color: #ff6b6b; font-weight: 500; min-height: 1.2em; margin: -4px 0 16px; }
-  .pending { color: var(--ink); background: var(--field); border-radius: 10px; padding: 12px 14px; margin: 0 0 18px; line-height: 1.6; }
+  button.plain { background: transparent; color: var(--muted); font-weight: 500; font-size: 16px; margin-top: 12px; }
+  .err { color: var(--r); font-weight: 500; margin: -6px 0 18px; min-height: 1em; }
+  .note { font-size: 14px; color: var(--muted); line-height: 1.7; margin-top: 24px; }
 
-  .bar { display: flex; justify-content: space-between; align-items: baseline; margin: 4px 0 14px; }
-  .bar .station { font-size: 16px; color: var(--muted); }
-  .bar .count { font-size: 22px; font-weight: 900; }
-  .bar .count small { font-size: 15px; font-weight: 500; color: var(--muted); }
-  .bar .count.stale { opacity: .5; }
-  .sync { margin: -6px 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--field); color: var(--muted); font-size: 15px; line-height: 1.5; }
-  .sync.bad { background: var(--bad); color: var(--ink); font-weight: 700; }
-  .toast {
-    position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 10;
-    max-width: 448px; margin: 0 auto; padding: 16px 18px; border-radius: 12px;
-    font-size: 17px; font-weight: 700; line-height: 1.5; background: var(--field); color: var(--ink); cursor: pointer;
-  }
-  .toast.dup { background: var(--dup); color: #000; }
-  .toast.bad { background: var(--bad); }
-  #reader { width: 100%; border-radius: 14px; overflow: hidden; background: #111; min-height: 280px; }
-  #reader video { border-radius: 14px; }
-  .camErr { color: var(--muted); line-height: 1.7; padding: 16px 4px; }
-  .snap { display: block; text-align: center; margin: 14px 0 0; padding: 18px; border-radius: 12px; background: var(--ink); color: #000; font-size: 20px; font-weight: 900; cursor: pointer; }
-  .manual { display: flex; gap: 10px; margin-top: 16px; }
-  .manual input { margin: 0; text-transform: uppercase; letter-spacing: .08em; }
-  .manual button { flex: none; }
-  .logout { background: transparent; color: var(--muted); font-size: 15px; font-weight: 500; padding: 14px 0; }
+  /* 通行證 */
+  .pass { border: 2px solid var(--ink); border-radius: 18px; overflow: hidden; }
+  .stripes { display: flex; flex-direction: column; }
+  .stripes i { display: block; height: 10px; background: #e6e6e6; transition: background-color .5s ease; }
+  .stripes i:nth-child(even) { background: #d4d4d4; }
+  .pass-body { padding: 22px 22px 26px; text-align: center; }
+  .team { display: inline-block; margin: 0 0 12px; padding: 6px 16px; border-radius: 999px; font-size: 16px; font-weight: 700; color: #fff; background: var(--ink); }
+  .team.light { color: var(--ink); }
+  .group-name { font-size: 24px; font-weight: 900; line-height: 1.35; margin: 0 0 18px; word-break: break-word; }
+  #qr { display: inline-block; padding: 12px; background: #fff; border-radius: 8px; transition: opacity .4s; }
+  #qr img, #qr canvas { display: block; width: 240px; height: 240px; }
+  .code { font-size: 20px; font-weight: 700; letter-spacing: .12em; margin: 12px 0 0; }
+  .status { font-size: 17px; font-weight: 500; margin: 18px 0 0; color: var(--muted); }
 
-  /* 結果覆蓋層 */
-  #overlay {
-    position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center;
-    padding: calc(env(safe-area-inset-top, 0px) + 28px) 28px calc(env(safe-area-inset-bottom, 0px) + 28px);
-    text-align: center; cursor: pointer;
-  }
-  #overlay.wait { background: rgba(0, 0, 0, .85); cursor: default; }
-  #overlay.ok { background: var(--ok); }
-  #overlay.dup { background: var(--dup); color: #000; }
-  #overlay.bad { background: var(--bad); }
-  #overlay.retry { cursor: default; }
-  #oTitle { font-size: 44px; font-weight: 900; margin: 0 0 18px; }
-  #oTeam { font-size: 20px; font-weight: 700; margin: 0 0 6px; opacity: .9; }
-  #oName { font-size: 30px; font-weight: 700; line-height: 1.35; margin: 0 0 14px; word-break: break-word; }
-  #oMeta { font-size: 18px; font-weight: 500; opacity: .85; margin: 0; line-height: 1.6; }
-  #oHint { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); font-size: 15px; opacity: .7; }
-  .oActions { display: flex; flex-direction: column; gap: 12px; margin: 28px auto 0; width: 100%; max-width: 360px; }
-  .oActions button { width: 100%; font-size: 22px; font-weight: 900; padding: 18px; }
-  .oActions .ghost { background: transparent; color: var(--ink); border: 2px solid rgba(255, 255, 255, .7); font-size: 18px; font-weight: 700; padding: 14px; }
+  .done .stripes i:nth-child(1) { background: var(--r); }
+  .done .stripes i:nth-child(2) { background: var(--o); transition-delay: .08s; }
+  .done .stripes i:nth-child(3) { background: var(--y); transition-delay: .16s; }
+  .done .stripes i:nth-child(4) { background: var(--g); transition-delay: .24s; }
+  .done .stripes i:nth-child(5) { background: var(--b); transition-delay: .32s; }
+  .done .stripes i:nth-child(6) { background: var(--p); transition-delay: .40s; }
+  .done #qr { opacity: .18; }
+  .done .status { color: var(--g); font-size: 30px; font-weight: 900; }
+  .done .status small { display: block; font-size: 16px; font-weight: 500; color: var(--muted); margin-top: 4px; }
+
   [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { .stripes i, #qr { transition: none !important; } }
 </style>
 </head>
 <body>
 <main>
-  <section id="loginView">
-    <p style="color:var(--muted);margin:0" id="eventName"></p>
-    <h1>團體報到掃描</h1>
-    <p class="pending" id="pendingNote" hidden></p>
-    <label for="pin">工作人員密碼</label>
-    <input id="pin" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
-    <label for="staff">你的名字</label>
-    <input id="staff" placeholder="會記錄在報到紀錄中">
-    <p class="err" id="loginErr" role="alert"></p>
-    <button class="wide" id="loginBtn">開始掃描</button>
+  <p class="event" id="eventName"></p>
+
+  <section id="formView">
+    <h1>團體報到</h1>
+    <label for="name">團體名稱</label>
+    <input id="name" autocomplete="off" placeholder="請輸入報名時填寫的團體名稱">
+    <label for="email">報名 Email</label>
+    <input id="email" type="email" inputmode="email" autocomplete="email" placeholder="name@example.com">
+    <p class="err" id="err" role="alert"></p>
+    <button id="go">顯示報到 QR Code</button>
+    <p class="note">請在報到處向工作人員出示 QR Code。報到完成後，這個畫面會自動變成「已完成報到」。</p>
   </section>
 
-  <section id="scanView" hidden>
-    <div class="bar">
-      <span class="station" id="stationLabel"></span>
-      <span class="count" id="count">– <small>/ –</small></span>
+  <section id="passView" hidden>
+    <div class="pass" id="pass">
+      <div class="stripes" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="pass-body">
+        <p class="team" id="gTeam" hidden></p>
+        <p class="group-name" id="gName"></p>
+        <div id="qr" aria-label="報到 QR Code"></div>
+        <p class="code" id="gCode"></p>
+        <p class="status" id="gStatus" aria-live="polite">請出示此畫面給工作人員掃描</p>
+      </div>
     </div>
-    <p class="sync" id="sync" hidden></p>
-    <div id="reader"></div>
-    <p class="camErr" id="camErr" hidden>這個瀏覽器無法直接開啟即時鏡頭，請點下方「拍照掃描」，或手動輸入團體代碼。</p>
-    <label class="snap" for="snapInput">拍照掃描</label>
-    <input id="snapInput" type="file" accept="image/*" capture="environment" hidden>
-    <div id="fileReader" hidden></div>
-    <div class="manual">
-      <input id="manualCode" placeholder="輸入團體代碼" autocapitalize="characters" autocomplete="off">
-      <button id="manualBtn">報到</button>
-    </div>
-    <button class="logout" id="logout">登出</button>
+    <p class="note">網路不穩時，也可以出示這個畫面的截圖讓工作人員掃描。</p>
+    <button class="plain" id="reset">查詢其他團體</button>
   </section>
 </main>
 
-<div class="toast" id="toast" hidden role="alert"></div>
-
-<div id="overlay" hidden role="alert">
-  <p id="oTitle"></p>
-  <p id="oTeam"></p>
-  <p id="oName"></p>
-  <p id="oMeta"></p>
-  <div class="oActions" id="oActions" hidden>
-    <button id="retryBtn">重送</button>
-    <button class="ghost" id="skipBtn">略過，繼續掃描</button>
-  </div>
-  <p id="oHint">點一下繼續掃描</p>
-</div>
-
 <script>
-  /* ---------- 設定 ---------- */
-  const CONFIG = {
-    // Apps Script 網頁應用程式網址（部署時「誰可以存取」須為「所有人」）
-    API_URL: 'https://script.google.com/a/macros/taiwanpride.lgbt/s/AKfycbzTg5AkU6ncqeVfDms1YcrKmoi9ua_BGdwR8tYmWsFn-WBXfwph0lg_HMM73UM7ePXL/exec',
-    EVENT_NAME: '第 24 屆臺灣同志遊行',
-    DEDUPE_MS: 4000,        // 同一個代碼多久內不重複送出
-    TIMEOUT_MS: 6000,       // 單次請求逾時；正常 1–3 秒，Google 偶爾會卡住不回，逾時後自動重試
-    TRIES: 3,               // 每個請求最多嘗試幾次
-    REFRESH_SECONDS: 30,    // 多久重新下載一次名單
-    SYNC_RETRY_MS: 5000,    // 背景同步失敗後多久再試
-  };
-
+  const SITE = window.SITE_CONFIG;
   const $ = id => document.getElementById(id);
-  const KEY = 'twpride_checkin_staff';
-  const QKEY = 'twpride_checkin_queue';
-  let session = null, scanner = null, busy = false, lastCode = '', lastAt = 0, hideTimer = null;
-  let retryCode = '', wakeLock = null, leaving = false;
-
-  // 名單：代碼 → { code, name, team, done, time }。null 表示伺服器不支援，改用逐筆連線報到
-  let roster = null;
-  // 待同步的報到（存在 localStorage，關掉頁面也不會遺失）
-  let queue = [];
-  // 剛同步完成的代碼，避免名單下載時間差把它們又變回未報到
-  const synced = new Map();
-  let flushing = false, flushTimer = null, syncErr = '';
-
-  const store = {
-    get() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } },
-    set(v) { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) {} },
-    clear() { try { localStorage.removeItem(KEY); } catch (e) {} },
-  };
-
-  /* ---------- 代碼解析：新網址 ?code=、舊網址 ?page=scan&code=、純代碼 ---------- */
-  function parseCode(raw) {
-    const s = String(raw || '').trim();
-    const m = s.match(/[?&]code=([^&#]+)/);
-    let v = m ? m[1] : s;
-    try { v = decodeURIComponent(v); } catch (e) {}
-    return v.trim().toUpperCase();
-  }
+  const POLL_MS = Math.max(5, Number(SITE.POLL_SECONDS) || 5) * 1000;
+  const TIMEOUT_MS = 8000;
+  const STORE = 'twpride_checkin_lookup';
+  let current = null, timer = null;
 
   /* ---------- Apps Script API ---------- */
-  // 失敗時丟出的 Error 帶有 detail（例如 HTTP 404、逾時），會顯示在錯誤訊息後方方便回報
   async function apiOnce(action, data) {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), CONFIG.TIMEOUT_MS);
-    let res, text;
+    const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
     try {
-      res = await fetch(CONFIG.API_URL, {
+      const res = await fetch(SITE.API_URL, {
         method: 'POST',
         // text/plain 不會觸發 CORS 預檢
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -186,468 +124,119 @@
         redirect: 'follow',
         signal: ctrl.signal,
       });
-      text = await res.text();
-    } catch (e) {
-      throw apiError(e && e.name === 'AbortError' ? '逾時' : '網路 ' + ((e && e.message) || e));
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.json();
     } finally {
       clearTimeout(t);
     }
-    if (!res.ok) throw apiError('HTTP ' + res.status);
-    try { return JSON.parse(text); } catch (e) { throw apiError('回應格式錯誤'); }
   }
 
-  function apiError(detail) { const e = new Error(detail); e.detail = detail; return e; }
-
-  // 失敗時自動重試。報到也可以重試：伺服器會擋下重複報到，回傳「已報到過」
-  async function api(action, data, onRetry) {
+  // Google 偶爾會卡住不回，失敗時自動重試
+  async function api(action, data) {
     for (let i = 1; ; i++) {
       try { return await apiOnce(action, data); }
       catch (e) {
-        if (i >= CONFIG.TRIES) throw e;
-        if (onRetry) onRetry(i + 1);
+        if (i >= 3) throw e;
         await new Promise(r => setTimeout(r, 500 * i));
       }
     }
   }
 
-  /* ---------- 時間（HH:mm，臺北時間） ---------- */
-  function nowHM() {
-    return new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Taipei', hour12: false }).slice(0, 5);
-  }
-  function minutesApart(a, b) {
-    const p = s => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || '')); return m ? +m[1] * 60 + +m[2] : NaN; };
-    const d = Math.abs(p(a) - p(b));
-    return isNaN(d) ? Infinity : Math.min(d, 1440 - d);
-  }
-  function isRecent(hhmm) { return minutesApart(hhmm, nowHM()) <= 2; }
-
-  function errNote(e) { return e && e.detail ? '（' + e.detail + '）' : ''; }
-
-  /* ---------- 登入 ---------- */
-  async function login(s, fromSaved) {
-    $('loginBtn').disabled = true;
-    $('loginErr').textContent = '';
-    let r;
+  async function lookup(name, email, silent) {
+    $('go').disabled = true;
+    $('err').textContent = '';
+    let res;
     try {
-      r = await api('getRoster', { pin: s.pin });
-      // 舊版後端沒有 getRoster：改用逐筆連線報到
-      if (r.error === 'action') {
-        const v = await api('verifyPin', { pin: s.pin });
-        r = v.ok ? { rows: null } : { error: 'pin' };
-      }
+      res = await api('lookupGroup', { name, email });
+      if (res.error) throw new Error(res.error);
     } catch (e) {
-      $('loginBtn').disabled = false;
-      $('loginErr').textContent = '連線失敗，請確認網路後再按一次「開始掃描」。' + errNote(e);
+      $('go').disabled = false;
+      $('err').textContent = '連線失敗，請確認網路後再試一次。';
       return;
     }
-    $('loginBtn').disabled = false;
-    if (r.error === 'pin') {
-      store.clear();
-      if (!fromSaved) $('loginErr').textContent = '密碼不正確。';
+    $('go').disabled = false;
+    if (!res.ok) {
+      if (!silent) $('err').textContent = '找不到相符的資料。請確認團體名稱與報名 Email 都和報名時填寫的一致。';
       return;
     }
-    if (r.error) {
-      $('loginErr').textContent = '系統讀取失敗，請稍後再按一次「開始掃描」。（' + (r.message || r.error) + '）';
-      return;
-    }
-    session = s;
-    store.set(s);
-    if (r.rows) applyRoster(r.rows);
-    $('loginView').hidden = true;
-    $('scanView').hidden = false;
-    $('stationLabel').textContent = s.staff ? '經手人：' + s.staff : '';
-    if (!roster) refresh();
-    renderSync();
-    flushQueue();
-    keepAwake();
-    startCamera();
-    const pre = takeUrlCode();
-    if (pre) submit(pre);
+    try { sessionStorage.setItem(STORE, JSON.stringify({ name, email })); } catch (e) {}
+    showPass(res);
   }
 
-  // 用手機內建相機掃描時，會帶著 ?code= 開啟這頁
-  let urlCode = parseCode(new URLSearchParams(location.search).get('code') || '');
-  function takeUrlCode() {
-    const c = urlCode;
-    urlCode = '';
-    if (c) { try { history.replaceState(null, '', location.pathname); } catch (e) {} }
-    $('pendingNote').hidden = true;
-    return c;
+  function showPass(res) {
+    current = res;
+    $('formView').hidden = true;
+    $('passView').hidden = false;
+    $('gName').textContent = res.name;
+    setTeam(res.team);
+    $('gCode').textContent = res.code;
+    $('qr').innerHTML = '';
+    new QRCode($('qr'), { text: res.qrText, width: 480, height: 480, correctLevel: QRCode.CorrectLevel.M });
+    setDone(res.done, res.time);
+    if (!res.done) schedule();
   }
 
-  /* ---------- 名單 ---------- */
-  function applyRoster(rows) {
-    roster = new Map(rows.map(g => [g.code, g]));
-    const now = Date.now();
-    synced.forEach((v, code) => { if (now - v.at > 180000) synced.delete(code); });
-    // 尚未同步或剛同步完成的報到，以手機上的紀錄為準
-    queue.concat([...synced.values()]).forEach(q => {
-      const g = roster.get(q.code);
-      if (g && !g.done) { g.done = true; g.time = q.time; }
-    });
-    updateCount();
+  const TEAM_COLORS = [[/紅|red/i, '--r'], [/橙|橘|orange/i, '--o'], [/黃|yellow/i, '--y'], [/綠|green/i, '--g'], [/藍|blue/i, '--b'], [/紫|purple/i, '--p']];
+  function setTeam(team) {
+    const el = $('gTeam');
+    el.hidden = !team;
+    if (!team) return;
+    el.textContent = team;
+    const hit = TEAM_COLORS.find(t => t[0].test(team));
+    el.style.background = hit ? 'var(' + hit[1] + ')' : 'var(--ink)';
+    el.classList.toggle('light', !!hit && hit[1] === '--y');
   }
 
-  function counts() {
-    let done = 0;
-    roster.forEach(g => { if (g.done) done++; });
-    return { done, total: roster.size };
-  }
-
-  function updateCount() {
-    if (!roster) return;
-    const c = counts();
-    setCount(c.done, c.total);
-  }
-
-  async function refresh() {
-    if (!session) return;
-    try {
-      if (roster) {
-        const r = await api('getRoster', { pin: session.pin });
-        if (r.error) throw new Error(r.error);
-        applyRoster(r.rows);
-      } else {
-        const s = await api('getStats', { pin: session.pin });
-        if (s.error) throw new Error(s.error);
-        setCount(s.done, s.total);
-      }
-    } catch (e) {
-      $('count').classList.add('stale');   // 數字變淡表示暫時無法更新
-    }
-  }
-
-  /* ---------- 鏡頭 ---------- */
-  function startCamera() {
-    if (scanner) return;
-    try {
-      scanner = new Html5Qrcode('reader', {
-        verbose: false,
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-      });
-      scanner.start(
-        { facingMode: 'environment' },
-        { fps: 15, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.8); return { width: s, height: s }; } },
-        onScan,
-        () => {}
-      ).then(() => { $('camErr').hidden = true; $('reader').hidden = false; }).catch(camFail);
-    } catch (e) { camFail(); }
-  }
-
-  function onScan(text) {
-    const code = parseCode(text);
-    const now = Date.now();
-    if (busy || !code || (code === lastCode && now - lastAt < CONFIG.DEDUPE_MS)) return;
-    lastCode = code; lastAt = now;
-    submit(code);
-  }
-
-  function camFail() {
-    try { scanner && scanner.clear(); } catch (e) {}
-    scanner = null;
-    $('camErr').hidden = false; $('reader').hidden = true;
-  }
-
-  // iOS 切到其他 App 再回來時，鏡頭串流可能已中斷，需要重新啟動
-  async function reviveCamera() {
-    if (!scanner || !session) return;
-    const v = document.querySelector('#reader video');
-    const track = v && v.srcObject && v.srcObject.getVideoTracks ? v.srcObject.getVideoTracks()[0] : null;
-    if (track && track.readyState === 'live') return;
-    try { await scanner.stop(); } catch (e) {}
-    try { scanner.clear(); } catch (e) {}
-    scanner = null;
-    startCamera();
-  }
-
-  function pauseCamera() { try { scanner && scanner.getState() === Html5QrcodeScannerState.SCANNING && scanner.pause(true); } catch (e) {} }
-  function resumeCamera() { try { scanner && scanner.getState() === Html5QrcodeScannerState.PAUSED && scanner.resume(); } catch (e) {} }
-
-  /* ---------- 螢幕常亮 ---------- */
-  async function keepAwake() {
-    if (!('wakeLock' in navigator) || !session || document.hidden) return;
-    if (wakeLock && !wakeLock.released) return;
-    try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* 不支援或被拒絕時略過 */ }
-  }
-
-  /* ---------- 報到 ---------- */
-  function submit(raw) {
-    const code = parseCode(raw);
-    if (busy || !session || !code) return;
-    busy = true;
-    pauseCamera();
-    // 名單上有的代碼：立刻顯示結果，背景寫入試算表
-    if (roster && roster.has(code)) quickCheckIn(code);
-    // 名單上沒有（可能是剛新增的團體）或後端不支援名單：逐筆連線確認
-    else send(code);
-  }
-
-  function quickCheckIn(code) {
-    const g = roster.get(code);
-    if (g.done) {
-      showResult({ result: 'dup', name: g.name, team: g.team, time: g.time });
-      return;
-    }
-    const time = nowHM();
-    g.done = true; g.time = time;
-    queue.push({ code: code, staff: session.staff, time: time });
-    saveQueue();
-    flushQueue();
-    const c = counts();
-    showResult({ result: 'ok', name: g.name, team: g.team, time: time, done: c.done, total: c.total });
-  }
-
-  // 逐筆連線報到（名單上沒有的代碼）
-  async function send(code, afterFailure) {
-    showWait();
-    let r;
-    try {
-      let retried = !!afterFailure;
-      r = await api('checkIn', { pin: session.pin, code: code, staff: session.staff }, n => {
-        retried = true;
-        $('oTitle').textContent = '報到中…';
-        $('oMeta').textContent = '連線較慢，重試中（' + n + '/' + CONFIG.TRIES + '）';
-      });
-      // 重試後才回「已報到過」且時間在 2 分鐘內：是前一次請求其實已寫入，只是回應沒收到
-      if (retried && r.result === 'dup' && isRecent(r.time)) {
-        r = { result: 'ok', name: r.name, team: r.team, time: r.time, confirmed: true };
-      }
-      if (r.error) r = { result: 'error', code: code, detail: r.message || r.error };
-    } catch (e) {
-      r = { result: 'net', code: code, detail: e.detail || '' };
-    }
-    if (roster && (r.result === 'ok' || r.result === 'dup')) {
-      roster.set(code, { code: code, name: r.name, team: r.team, done: true, time: r.time });
-      if (r.result === 'ok') { const c = counts(); r.done = c.done; r.total = c.total; r.confirmed = false; }
-    } else if (r.confirmed) {
-      refresh();
-    }
-    showResult(r);
-  }
-
-  /* ---------- 背景同步 ---------- */
-  function loadQueue() {
-    try { const q = JSON.parse(localStorage.getItem(QKEY) || '[]'); return Array.isArray(q) ? q : []; } catch (e) { return []; }
-  }
-  function saveQueue() {
-    try { localStorage.setItem(QKEY, JSON.stringify(queue)); } catch (e) {}
-    renderSync();
-  }
-
-  async function flushQueue() {
-    if (flushing || !session) return;
-    flushing = true;
-    clearTimeout(flushTimer);
-    try {
-      while (queue.length) {
-        const item = queue[0];
-        let r;
-        try {
-          r = await api('checkIn', { pin: session.pin, code: item.code, staff: item.staff });
-        } catch (e) {
-          r = { error: e.detail || '連線失敗' };
-        }
-        if (r.result === 'pin') { showResult({ result: 'pin' }); return; }
-        if (r.error) {
-          syncErr = r.message || r.error;
-          renderSync();
-          flushTimer = setTimeout(flushQueue, CONFIG.SYNC_RETRY_MS);
-          return;
-        }
-        queue.shift();
-        syncErr = '';
-        saveQueue();
-        settle(item, r);
-      }
-    } finally {
-      flushing = false;
-    }
-  }
-
-  // 同步結果和手機上顯示的不同時才提醒
-  function settle(item, r) {
-    const g = roster && roster.get(item.code);
-    if (r.result === 'ok' || r.result === 'dup') {
-      synced.set(item.code, { code: item.code, time: r.time, at: Date.now() });
-      if (g) g.time = r.time;
-      // 已報到過、且時間和這次掃描差超過 2 分鐘：在這之前就有人報到了
-      if (r.result === 'dup' && minutesApart(r.time, item.time) > 2) {
-        toast('⚠️ ' + (r.name || item.code) + ' 其實在 ' + r.time + ' 就已報到過', 'dup');
-      }
+  function setDone(done, time) {
+    $('pass').classList.toggle('done', !!done);
+    $('gStatus').innerHTML = '';
+    if (done) {
+      $('gStatus').append('已完成報到');
+      if (time) { const s = document.createElement('small'); s.textContent = '報到時間 ' + time; $('gStatus').append(s); }
     } else {
-      if (g) { g.done = false; g.time = ''; }
-      toast('❌ ' + item.code + ' 查無此代碼，這筆報到沒有寫入試算表', 'bad');
+      $('gStatus').textContent = '請出示此畫面給工作人員掃描';
     }
-    updateCount();
   }
 
-  function renderSync() {
-    const el = $('sync');
-    if (!el) return;
-    el.hidden = !queue.length;
-    el.classList.toggle('bad', !!syncErr);
-    el.textContent = !queue.length ? ''
-      : syncErr ? '⚠️ 待同步 ' + queue.length + ' 筆：連線失敗，自動重試中（' + syncErr + '）'
-      : '待同步 ' + queue.length + ' 筆，寫入試算表中…';
+  function schedule() {
+    clearTimeout(timer);
+    timer = setTimeout(poll, POLL_MS);
   }
 
-  let toastTimer = null;
-  function toast(text, kind) {
-    const el = $('toast');
-    el.textContent = text;
-    el.className = 'toast ' + (kind || '');
-    el.hidden = false;
-    buzz([200, 100, 200]);
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.hidden = true; }, 8000);
-  }
-
-  /* ---------- 結果畫面 ---------- */
-  function showWait() {
-    clearTimeout(hideTimer);
-    const o = $('overlay');
-    o.className = 'wait';
-    $('oTitle').textContent = '報到中…';
-    $('oTeam').textContent = ''; $('oName').textContent = ''; $('oMeta').textContent = '';
-    $('oActions').hidden = true; $('oHint').hidden = true;
-    o.hidden = false;
-  }
-
-  function showResult(r) {
-    const o = $('overlay');
-    o.className = '';
-    let title = '', name = '', meta = '', team = r.team || '', retry = false;
-    if (r.result === 'ok') {
-      o.classList.add('ok'); title = '✅ 報到完成'; name = r.name;
-      if (r.confirmed) { meta = r.time + ' 報到'; }
-      else { meta = r.time + ' 報到　目前 ' + r.done + ' / ' + r.total; setCount(r.done, r.total); }
-      buzz([120]);
-    } else if (r.result === 'dup') {
-      o.classList.add('dup'); title = '⚠️ 已報到過'; name = r.name; meta = r.time + ' 已完成報到';
-      buzz([80, 80, 80]);
-    } else if (r.result === 'pin') {
-      o.classList.add('bad'); title = '密碼已變更'; meta = '請重新登入';
-      store.clear(); leaving = true; setTimeout(() => location.reload(), 1500);
-    } else if (r.result === 'unread') {
-      o.classList.add('bad'); title = '讀不到 QR Code'; meta = '請靠近一點、對準 QR Code 再拍一次';
-      buzz([300]);
-    } else if (r.result === 'net' || r.result === 'error') {
-      o.classList.add('bad', 'retry');
-      title = r.result === 'net' ? '連線失敗' : '讀取失敗';
-      name = r.code || '';
-      meta = (r.result === 'net' ? '這筆報到還沒有送出成功，請確認網路後按「重送」。' : '系統忙碌，這筆報到還沒有完成，請按「重送」。')
-        + (r.detail ? '（' + r.detail + '）' : '');
-      retry = true; retryCode = r.code || '';
-      buzz([300, 100, 300]);
-    } else {
-      o.classList.add('bad'); title = '❌ 查無此代碼'; name = r.code || ''; meta = '請確認是否為本屆的報到 QR Code';
-      buzz([300]);
-    }
-    $('oTitle').textContent = title;
-    $('oTeam').textContent = team;
-    $('oName').textContent = name;
-    $('oMeta').textContent = meta;
-    $('oActions').hidden = !retry;
-    $('oHint').hidden = retry;
-    o.hidden = false;
-    clearTimeout(hideTimer);
-    // 連線失敗時不自動關閉，避免這筆報到被默默略過
-    if (!retry) hideTimer = setTimeout(dismiss, r.result === 'ok' ? 1200 : 3000);
-  }
-
-  function dismiss() {
-    clearTimeout(hideTimer);
-    $('overlay').hidden = true;
-    retryCode = '';
-    busy = false;
-    lastAt = Date.now();   // 從恢復掃描起算，避免同一張 QR Code 還在鏡頭前又被送出
-    resumeCamera();
-  }
-
-  function buzz(p) { if (navigator.vibrate) navigator.vibrate(p); }
-  function setCount(d, t) {
-    $('count').classList.remove('stale');
-    $('count').innerHTML = d + ' <small>/ ' + t + '</small>';
-  }
-
-  /* ---------- 事件 ---------- */
-  $('overlay').addEventListener('click', () => {
-    const c = $('overlay').classList;
-    if (c.contains('retry') || c.contains('wait')) return;
-    dismiss();
-  });
-  $('retryBtn').addEventListener('click', e => { e.stopPropagation(); if (retryCode) send(retryCode, true); else dismiss(); });
-  $('skipBtn').addEventListener('click', e => { e.stopPropagation(); dismiss(); });
-  $('toast').addEventListener('click', () => { $('toast').hidden = true; });
-
-  $('loginBtn').addEventListener('click', () => {
-    const s = { pin: $('pin').value.trim(), staff: $('staff').value.trim() };
-    if (!s.pin) { $('loginErr').textContent = '請輸入工作人員密碼。'; return; }
-    login(s, false);
-  });
-  $('staff').addEventListener('keydown', e => { if (e.key === 'Enter') $('loginBtn').click(); });
-  $('manualBtn').addEventListener('click', () => {
-    const v = $('manualCode').value.trim();
-    if (!v) return;
-    $('manualCode').value = '';
-    $('manualCode').blur();
-    submit(v);
-  });
-  $('manualCode').addEventListener('keydown', e => { if (e.key === 'Enter') $('manualBtn').click(); });
-  $('snapInput').addEventListener('change', async e => {
-    const f = e.target.files && e.target.files[0];
-    e.target.value = '';
-    if (!f || busy) return;
+  async function poll() {
+    if (!current) return;
+    if (document.hidden) { schedule(); return; }
     try {
-      const reader = new Html5Qrcode('fileReader', { verbose: false });
-      const text = await reader.scanFile(f, false);
-      submit(text);
-    } catch (err) {
-      showResult({ result: 'unread' });
+      const s = await api('getStatus', { code: current.code });
+      if (s.done) { setDone(true, s.time); if (navigator.vibrate) navigator.vibrate(200); }
+      else schedule();
+    } catch (e) {
+      schedule();
     }
-  });
-  $('logout').addEventListener('click', async () => {
-    // 還有報到沒寫進試算表時不能登出，以免遺失
-    if (queue.length) {
-      toast('還有 ' + queue.length + ' 筆報到尚未寫入試算表，請等同步完成再登出', 'bad');
-      flushQueue();
-      return;
-    }
-    store.clear();
-    leaving = true;
-    try { wakeLock && await wakeLock.release(); } catch (e) {}
-    try { scanner && await scanner.stop(); } catch (e) {}
-    location.replace(location.pathname);
-  });
-  // 關閉或重新整理頁面時，若還有待同步的報到就提醒
-  window.addEventListener('beforeunload', e => {
-    if (leaving || !queue.length) return;
-    e.preventDefault();
-    e.returnValue = '';
-  });
-  window.addEventListener('online', () => flushQueue());
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden || !session) return;
-    keepAwake();
-    reviveCamera();
-    flushQueue();
-    refresh();
-  });
-  setInterval(refresh, CONFIG.REFRESH_SECONDS * 1000);
+  }
 
-  /* ---------- 啟動 ---------- */
-  $('eventName').textContent = CONFIG.EVENT_NAME;
-  queue = loadQueue();
-  if (urlCode) {
-    $('pendingNote').textContent = '登入後會自動報到：' + urlCode;
-    $('pendingNote').hidden = false;
-  }
-  const saved = store.get();
-  if (saved && saved.pin) {
-    $('pin').value = saved.pin; $('staff').value = saved.staff || '';
-    login(saved, true);
-  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && current && !$('pass').classList.contains('done')) poll(); });
+
+  $('go').addEventListener('click', () => {
+    const name = $('name').value.trim(), email = $('email').value.trim();
+    if (!name || !email) { $('err').textContent = '請填寫團體名稱與報名 Email。'; return; }
+    lookup(name, email, false);
+  });
+  $('email').addEventListener('keydown', e => { if (e.key === 'Enter') $('go').click(); });
+
+  $('reset').addEventListener('click', () => {
+    clearTimeout(timer);
+    current = null;
+    try { sessionStorage.removeItem(STORE); } catch (e) {}
+    $('passView').hidden = true;
+    $('formView').hidden = false;
+  });
+
+  $('eventName').textContent = SITE.EVENT_NAME;
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(STORE) || 'null');
+    if (saved) { $('name').value = saved.name; $('email').value = saved.email; lookup(saved.name, saved.email, true); }
+  } catch (e) {}
 </script>
 </body>
 </html>
