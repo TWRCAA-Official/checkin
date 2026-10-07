@@ -233,6 +233,8 @@
   });
 
   $('eventName').textContent = SITE.EVENT_NAME;
+  // 一打開頁面就先喚醒 Apps Script（閒置後第一次呼叫要 8 秒以上），填資料時就醒好了
+  apiOnce('getStatus', { code: '' }).catch(() => {});
   try {
     const saved = JSON.parse(sessionStorage.getItem(STORE) || 'null');
     if (saved) { $('name').value = saved.name; $('email').value = saved.email; lookup(saved.name, saved.email, true); }

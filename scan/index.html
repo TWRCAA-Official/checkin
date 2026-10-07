@@ -648,7 +648,9 @@
     $('pendingNote').textContent = '登入後會自動報到：' + urlCode;
     $('pendingNote').hidden = false;
   }
+  // 一打開頁面就先喚醒 Apps Script（閒置後第一次呼叫要 8 秒以上），輸入密碼時就醒好了
   const saved = store.get();
+  if (!(saved && saved.pin)) apiOnce('getStatus', { code: '' }).catch(() => {});
   if (saved && saved.pin) {
     $('pin').value = saved.pin; $('staff').value = saved.staff || '';
     login(saved, true);
