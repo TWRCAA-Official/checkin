@@ -201,32 +201,33 @@
 
   function apiError(detail) { const e = new Error(detail); e.detail = detail; return e; }
 
-  // Google 偶爾會在把請求交給 Apps Script 前卡住 20 秒左右（程式本身只跑 1 秒內）。
-  // 前一個請求 HEDGE_MS 內沒回就再送一個相同的，誰先回用誰，最多同時 TRIES 個。
+  // Google 偶爾會在把請求交給 Apps Script 前卡住 15～30 秒（程式本身只跑 1 秒內），而且常常連續好幾次。
+  // 前一個請求 CONFIG.HEDGE_MS 內沒回就再送一個相同的，誰先回用誰：最多同時 5 個、總共 8 個、持續 45 秒。
   // 只用在重複送出也安全的動作：查詢類，以及背景同步的報到（伺服器會擋下重複報到）。
-  function apiRace(action, data, timeoutMs) {
+  const RACE = { MAX_PARALLEL: 5, MAX_SENDS: 8, DEADLINE_MS: 45000 };
+  function apiRace(action, data) {
     return new Promise((resolve, reject) => {
-      const ctrls = [];
+      const ctrls = [], started = Date.now();
       let settled = false, running = 0, sent = 0, lastErr = null, hedge = null;
       const end = (fn, v) => {
         if (settled) return;
         settled = true;
-        clearTimeout(hedge);
+        clearTimeout(hedge); clearTimeout(deadline);
         ctrls.forEach(c => c.abort());
         fn(v);
       };
+      const deadline = setTimeout(() => end(reject, lastErr || apiError('逾時')), RACE.DEADLINE_MS);
       const launch = () => {
-        if (settled || sent >= CONFIG.TRIES) return;
-        sent++; running++;
-        const ctrl = new AbortController();
-        ctrls.push(ctrl);
-        apiOnce(action, data, timeoutMs, ctrl).then(v => end(resolve, v), e => {
-          running--; lastErr = e;
-          if (sent < CONFIG.TRIES) launch();
-          else if (!running) end(reject, lastErr);
-        });
         clearTimeout(hedge);
-        if (sent < CONFIG.TRIES) hedge = setTimeout(launch, CONFIG.HEDGE_MS);
+        if (settled) return;
+        if (sent < RACE.MAX_SENDS && running < RACE.MAX_PARALLEL && Date.now() - started < RACE.DEADLINE_MS) {
+          sent++; running++;
+          const ctrl = new AbortController();
+          ctrls.push(ctrl);
+          apiOnce(action, data, CONFIG.TIMEOUT_MS, ctrl).then(v => end(resolve, v), e => { running--; lastErr = e; launch(); });
+        }
+        if (!running) { end(reject, lastErr); return; }
+        hedge = setTimeout(launch, CONFIG.HEDGE_MS);
       };
       launch();
     });
