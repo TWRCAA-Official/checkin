@@ -139,6 +139,7 @@
     DEDUPE_MS: 4000,        // 同一個代碼多久內不重複送出
     TIMEOUT_MS: 20000,      // 單次請求逾時；Apps Script 閒置後第一次呼叫要先喚醒，可能超過 8 秒
     FAST_TIMEOUT_MS: 6000,  // 畫面上等待中的逐筆報到：正常 1–3 秒，卡住就快點重試
+    HEDGE_MS: 2500,         // 查詢類請求多久沒回就再送一個（見 apiRace）
     TRIES: 3,               // 每個請求最多嘗試幾次
     REFRESH_SECONDS: 30,    // 多久重新下載一次名單
     SYNC_RETRY_MS: 5000,    // 背景同步失敗後多久再試
@@ -175,8 +176,8 @@
 
   /* ---------- Apps Script API ---------- */
   // 失敗時丟出的 Error 帶有 detail（例如 HTTP 404、逾時），會顯示在錯誤訊息後方方便回報
-  async function apiOnce(action, data, timeoutMs) {
-    const ctrl = new AbortController();
+  async function apiOnce(action, data, timeoutMs, ctrl) {
+    ctrl = ctrl || new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs || CONFIG.TIMEOUT_MS);
     let res, text;
     try {
@@ -199,6 +200,37 @@
   }
 
   function apiError(detail) { const e = new Error(detail); e.detail = detail; return e; }
+
+  // Google 偶爾會在把請求交給 Apps Script 前卡住 20 秒左右（程式本身只跑 1 秒內）。
+  // 前一個請求 HEDGE_MS 內沒回就再送一個相同的，誰先回用誰，最多同時 TRIES 個。
+  // 只用在重複送出也安全的動作：查詢類，以及背景同步的報到（伺服器會擋下重複報到）。
+  function apiRace(action, data, timeoutMs) {
+    return new Promise((resolve, reject) => {
+      const ctrls = [];
+      let settled = false, running = 0, sent = 0, lastErr = null, hedge = null;
+      const end = (fn, v) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(hedge);
+        ctrls.forEach(c => c.abort());
+        fn(v);
+      };
+      const launch = () => {
+        if (settled || sent >= CONFIG.TRIES) return;
+        sent++; running++;
+        const ctrl = new AbortController();
+        ctrls.push(ctrl);
+        apiOnce(action, data, timeoutMs, ctrl).then(v => end(resolve, v), e => {
+          running--; lastErr = e;
+          if (sent < CONFIG.TRIES) launch();
+          else if (!running) end(reject, lastErr);
+        });
+        clearTimeout(hedge);
+        if (sent < CONFIG.TRIES) hedge = setTimeout(launch, CONFIG.HEDGE_MS);
+      };
+      launch();
+    });
+  }
 
   // 失敗時自動重試。報到也可以重試：伺服器會擋下重複報到，回傳「已報到過」
   async function api(action, data, onRetry, timeoutMs) {
@@ -232,10 +264,10 @@
     $('loginErr').textContent = '';
     let r;
     try {
-      r = await api('getRoster', { pin: s.pin });
+      r = await apiRace('getRoster', { pin: s.pin });
       // 舊版後端沒有 getRoster：改用逐筆連線報到
       if (r.error === 'action') {
-        const v = await api('verifyPin', { pin: s.pin });
+        const v = await apiRace('verifyPin', { pin: s.pin });
         r = v.ok ? { rows: null } : { error: 'pin' };
       }
     } catch (e) {
@@ -309,11 +341,11 @@
     if (!session) return;
     try {
       if (roster) {
-        const r = await api('getRoster', { pin: session.pin });
+        const r = await apiRace('getRoster', { pin: session.pin });
         if (r.error) throw new Error(r.error);
         applyRoster(r.rows);
       } else {
-        const s = await api('getStats', { pin: session.pin });
+        const s = await apiRace('getStats', { pin: session.pin });
         if (s.error) throw new Error(s.error);
         setCount(s.done, s.total);
       }
@@ -449,7 +481,7 @@
         const item = queue[0];
         let r;
         try {
-          r = await api('checkIn', { pin: session.pin, code: item.code, staff: item.staff });
+          r = await apiRace('checkIn', { pin: session.pin, code: item.code, staff: item.staff });
         } catch (e) {
           r = { error: e.detail || '連線失敗' };
         }

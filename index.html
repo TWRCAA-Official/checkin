@@ -108,13 +108,16 @@
   const $ = id => document.getElementById(id);
   const POLL_MS = Math.max(5, Number(SITE.POLL_SECONDS) || 5) * 1000;
   const TIMEOUT_MS = 20000;   // Apps Script 閒置後第一次呼叫要先喚醒，可能超過 8 秒
-  const STORE = 'twpride_checkin_lookup';
+  const POLL_TIMEOUT_MS = 8000;
+  const HEDGE_MS = 2500;
+  // 查到的通行證存在手機裡，重新打開不必再等查詢（不存 Email）
+  const STORE = 'twpride_checkin_pass';
   let current = null, timer = null;
 
   /* ---------- Apps Script API ---------- */
-  async function apiOnce(action, data) {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  async function apiOnce(action, data, timeoutMs, ctrl) {
+    ctrl = ctrl || new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs || TIMEOUT_MS);
     try {
       const res = await fetch(SITE.API_URL, {
         method: 'POST',
@@ -131,36 +134,71 @@
     }
   }
 
-  // Google 偶爾會卡住不回，失敗時自動重試
-  async function api(action, data) {
-    for (let i = 1; ; i++) {
-      try { return await apiOnce(action, data); }
-      catch (e) {
-        if (i >= 3) throw e;
-        await new Promise(r => setTimeout(r, 500 * i));
-      }
-    }
+  // Google 偶爾會在把請求交給 Apps Script 前卡住 20 秒左右（程式本身只跑 1 秒內）。
+  // 前一個請求 HEDGE_MS 內沒回就再送一個相同的，誰先回用誰，最多同時 3 個。
+  function apiRace(action, data) {
+    return new Promise((resolve, reject) => {
+      const ctrls = [];
+      let settled = false, running = 0, sent = 0, lastErr = null, hedge = null;
+      const end = (fn, v) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(hedge);
+        ctrls.forEach(c => c.abort());
+        fn(v);
+      };
+      const launch = () => {
+        if (settled || sent >= 3) return;
+        sent++; running++;
+        const ctrl = new AbortController();
+        ctrls.push(ctrl);
+        apiOnce(action, data, TIMEOUT_MS, ctrl).then(v => end(resolve, v), e => {
+          running--; lastErr = e;
+          if (sent < 3) launch();
+          else if (!running) end(reject, lastErr);
+        });
+        clearTimeout(hedge);
+        if (sent < 3) hedge = setTimeout(launch, HEDGE_MS);
+      };
+      launch();
+    });
   }
 
-  async function lookup(name, email, silent) {
+  async function lookup(name, email) {
     $('go').disabled = true;
+    $('go').textContent = '查詢中…';
     $('err').textContent = '';
     let res;
     try {
-      res = await api('lookupGroup', { name, email });
+      res = await apiRace('lookupGroup', { name, email });
       if (res.error) throw new Error(res.error);
     } catch (e) {
-      $('go').disabled = false;
+      res = null;
+    }
+    $('go').disabled = false;
+    $('go').textContent = '顯示報到 QR Code';
+    if (!res) {
       $('err').textContent = '連線失敗，請確認網路後再試一次。';
       return;
     }
-    $('go').disabled = false;
     if (!res.ok) {
-      if (!silent) $('err').textContent = '找不到相符的資料。請確認團體名稱與報名 Email 都和報名時填寫的一致。';
+      $('err').textContent = '找不到相符的資料。請確認團體名稱與報名 Email 都和報名時填寫的一致。';
       return;
     }
-    try { sessionStorage.setItem(STORE, JSON.stringify({ name, email })); } catch (e) {}
+    savePass(res);
     showPass(res);
+  }
+
+  function savePass(res) {
+    const keep = { event: SITE.EVENT_NAME, code: res.code, name: res.name, team: res.team, qrText: res.qrText, done: res.done, time: res.time };
+    try { localStorage.setItem(STORE, JSON.stringify(keep)); } catch (e) {}
+  }
+
+  function loadPass() {
+    try {
+      const p = JSON.parse(localStorage.getItem(STORE) || 'null');
+      return p && p.event === SITE.EVENT_NAME && p.code && p.qrText ? p : null;   // 不同年度的不沿用
+    } catch (e) { return null; }
   }
 
   function showPass(res) {
@@ -207,11 +245,15 @@
     if (!current) return;
     if (document.hidden) { schedule(); return; }
     try {
-      const s = await api('getStatus', { code: current.code });
-      if (s.done) { setDone(true, s.time); if (navigator.vibrate) navigator.vibrate(200); }
+      const s = await apiOnce('getStatus', { code: current.code }, POLL_TIMEOUT_MS);
+      if (s.done) {
+        setDone(true, s.time);
+        savePass(Object.assign({}, current, { done: true, time: s.time }));
+        if (navigator.vibrate) navigator.vibrate(200);
+      }
       else schedule();
     } catch (e) {
-      schedule();
+      schedule();   // 這次卡住就等下一輪
     }
   }
 
@@ -220,25 +262,29 @@
   $('go').addEventListener('click', () => {
     const name = $('name').value.trim(), email = $('email').value.trim();
     if (!name || !email) { $('err').textContent = '請填寫團體名稱與報名 Email。'; return; }
-    lookup(name, email, false);
+    lookup(name, email);
   });
   $('email').addEventListener('keydown', e => { if (e.key === 'Enter') $('go').click(); });
 
   $('reset').addEventListener('click', () => {
     clearTimeout(timer);
     current = null;
-    try { sessionStorage.removeItem(STORE); } catch (e) {}
+    try { localStorage.removeItem(STORE); } catch (e) {}
     $('passView').hidden = true;
     $('formView').hidden = false;
   });
 
   $('eventName').textContent = SITE.EVENT_NAME;
-  // 一打開頁面就先喚醒 Apps Script（閒置後第一次呼叫要 8 秒以上），填資料時就醒好了
-  apiOnce('getStatus', { code: '' }).catch(() => {});
-  try {
-    const saved = JSON.parse(sessionStorage.getItem(STORE) || 'null');
-    if (saved) { $('name').value = saved.name; $('email').value = saved.email; lookup(saved.name, saved.email, true); }
-  } catch (e) {}
+  try { sessionStorage.removeItem('twpride_checkin_lookup'); } catch (e) {}   // 舊版存的名稱與 Email
+  const saved = loadPass();
+  if (saved) {
+    // 之前查過：直接顯示通行證，報到狀態在背景更新
+    showPass(saved);
+    if (!saved.done) poll();
+  } else {
+    // 一打開頁面就先喚醒 Apps Script（閒置後第一次呼叫要 8 秒以上），填資料時就醒好了
+    apiOnce('getStatus', { code: '' }).catch(() => {});
+  }
 </script>
 </body>
 </html>
