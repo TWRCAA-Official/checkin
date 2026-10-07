@@ -554,7 +554,7 @@
   function showResult(r) {
     const o = $('overlay');
     o.className = '';
-    let title = '', name = '', meta = '', team = r.team || '', retry = false;
+    let title = '', name = '', meta = '', team = teamLabel(r.team), retry = false;
     if (r.result === 'ok') {
       o.classList.add('ok'); title = '✅ 報到完成'; name = r.name;
       if (r.confirmed) { meta = r.time + ' 報到'; }
@@ -603,6 +603,13 @@
   }
 
   function buzz(p) { if (navigator.vibrate) navigator.vibrate(p); }
+  // 試算表的大隊欄可能只寫「黃色」或「黃」，顯示時一律補成「黃色大隊」
+  function teamLabel(team) {
+    const t = String(team || '').trim();
+    if (!t || /大隊|team/i.test(t)) return t;
+    if (/^[紅橙橘黃綠藍紫]$/.test(t)) return t + '色大隊';
+    return t + '大隊';
+  }
   function setCount(d, t) {
     $('count').classList.remove('stale');
     $('count').innerHTML = d + ' <small>/ ' + t + '</small>';

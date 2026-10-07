@@ -7,4 +7,5 @@ window.SITE_CONFIG = {
   API_URL: 'https://script.google.com/a/macros/taiwanpride.lgbt/s/AKfycbzTg5AkU6ncqeVfDms1YcrKmoi9ua_BGdwR8tYmWsFn-WBXfwph0lg_HMM73UM7ePXL/exec',
   EVENT_NAME: '第 24 屆臺灣同志遊行',
   POLL_SECONDS: 5,   // 團體頁多久查詢一次報到狀態
+  CHECKIN_DEADLINE: '13:20',   // 團體頁提醒的報到截止時間
 };

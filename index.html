@@ -43,6 +43,7 @@
   button.plain { background: transparent; color: var(--muted); font-weight: 500; font-size: 16px; margin-top: 12px; }
   .err { color: var(--r); font-weight: 500; margin: -6px 0 18px; min-height: 1em; }
   .note { font-size: 14px; color: var(--muted); line-height: 1.7; margin-top: 24px; }
+  .note strong { color: var(--ink); }
 
   /* 通行證 */
   .pass { border: 2px solid var(--ink); border-radius: 18px; overflow: hidden; }
@@ -98,7 +99,7 @@
         <p class="status" id="gStatus" aria-live="polite">請出示此畫面給工作人員掃描</p>
       </div>
     </div>
-    <p class="note">網路不穩時，也可以出示這個畫面的截圖讓工作人員掃描。</p>
+    <p class="note" id="passNote">建議先<strong>截圖保存這個畫面</strong>，現場網路不穩時也能直接出示截圖報到。<span id="deadlineLine"><br>請在 <strong id="deadline"></strong> 前完成報到。</span></p>
     <button class="plain" id="reset">查詢其他團體</button>
   </section>
 </main>
@@ -166,8 +167,8 @@
 
   async function lookup(name, email) {
     $('go').disabled = true;
-    $('go').textContent = '查詢中…';
     $('err').textContent = '';
+    const stopWaiting = waiting($('go'));
     let res;
     try {
       res = await apiRace('lookupGroup', { name, email });
@@ -175,8 +176,8 @@
     } catch (e) {
       res = null;
     }
+    stopWaiting();
     $('go').disabled = false;
-    $('go').textContent = '顯示報到 QR Code';
     if (!res) {
       $('err').textContent = '連線失敗，請確認網路後再試一次。';
       return;
@@ -187,6 +188,29 @@
     }
     savePass(res);
     showPass(res);
+  }
+
+  // 按鈕顯示「等待中.」「等待中..」「等待中...」輪播；超過 6 秒補一句請對方稍候
+  function waiting(btn) {
+    const label = btn.textContent;
+    const started = Date.now();
+    let dots = 0;
+    const tick = () => {
+      dots = dots % 3 + 1;
+      const slow = Date.now() - started > 6000 ? '連線較慢，' : '';
+      btn.textContent = slow + '等待中' + '.'.repeat(dots);
+    };
+    tick();
+    const iv = setInterval(tick, 400);
+    return () => { clearInterval(iv); btn.textContent = label; };
+  }
+
+  // 試算表的大隊欄可能只寫「黃色」或「黃」，顯示時一律補成「黃色大隊」
+  function teamLabel(team) {
+    const t = String(team || '').trim();
+    if (!t || /大隊|team/i.test(t)) return t;
+    if (/^[紅橙橘黃綠藍紫]$/.test(t)) return t + '色大隊';
+    return t + '大隊';
   }
 
   function savePass(res) {
@@ -219,7 +243,7 @@
     const el = $('gTeam');
     el.hidden = !team;
     if (!team) return;
-    el.textContent = team;
+    el.textContent = teamLabel(team);
     const hit = TEAM_COLORS.find(t => t[0].test(team));
     el.style.background = hit ? 'var(' + hit[1] + ')' : 'var(--ink)';
     el.classList.toggle('light', !!hit && hit[1] === '--y');
@@ -275,6 +299,8 @@
   });
 
   $('eventName').textContent = SITE.EVENT_NAME;
+  $('deadline').textContent = SITE.CHECKIN_DEADLINE || '';
+  $('deadlineLine').hidden = !SITE.CHECKIN_DEADLINE;
   try { sessionStorage.removeItem('twpride_checkin_lookup'); } catch (e) {}   // 舊版存的名稱與 Email
   const saved = loadPass();
   if (saved) {
