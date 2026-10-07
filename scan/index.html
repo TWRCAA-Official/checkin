@@ -137,7 +137,8 @@
     API_URL: window.SITE_CONFIG.API_URL,
     EVENT_NAME: window.SITE_CONFIG.EVENT_NAME,
     DEDUPE_MS: 4000,        // 同一個代碼多久內不重複送出
-    TIMEOUT_MS: 6000,       // 單次請求逾時；正常 1–3 秒，Google 偶爾會卡住不回，逾時後自動重試
+    TIMEOUT_MS: 20000,      // 單次請求逾時；Apps Script 閒置後第一次呼叫要先喚醒，可能超過 8 秒
+    FAST_TIMEOUT_MS: 6000,  // 畫面上等待中的逐筆報到：正常 1–3 秒，卡住就快點重試
     TRIES: 3,               // 每個請求最多嘗試幾次
     REFRESH_SECONDS: 30,    // 多久重新下載一次名單
     SYNC_RETRY_MS: 5000,    // 背景同步失敗後多久再試
@@ -174,9 +175,9 @@
 
   /* ---------- Apps Script API ---------- */
   // 失敗時丟出的 Error 帶有 detail（例如 HTTP 404、逾時），會顯示在錯誤訊息後方方便回報
-  async function apiOnce(action, data) {
+  async function apiOnce(action, data, timeoutMs) {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), CONFIG.TIMEOUT_MS);
+    const t = setTimeout(() => ctrl.abort(), timeoutMs || CONFIG.TIMEOUT_MS);
     let res, text;
     try {
       res = await fetch(CONFIG.API_URL, {
@@ -200,9 +201,9 @@
   function apiError(detail) { const e = new Error(detail); e.detail = detail; return e; }
 
   // 失敗時自動重試。報到也可以重試：伺服器會擋下重複報到，回傳「已報到過」
-  async function api(action, data, onRetry) {
+  async function api(action, data, onRetry, timeoutMs) {
     for (let i = 1; ; i++) {
-      try { return await apiOnce(action, data); }
+      try { return await apiOnce(action, data, timeoutMs); }
       catch (e) {
         if (i >= CONFIG.TRIES) throw e;
         if (onRetry) onRetry(i + 1);
@@ -227,6 +228,7 @@
   /* ---------- 登入 ---------- */
   async function login(s, fromSaved) {
     $('loginBtn').disabled = true;
+    $('loginBtn').textContent = '連線中…';
     $('loginErr').textContent = '';
     let r;
     try {
@@ -238,10 +240,12 @@
       }
     } catch (e) {
       $('loginBtn').disabled = false;
+      $('loginBtn').textContent = '開始掃描';
       $('loginErr').textContent = '連線失敗，請確認網路後再按一次「開始掃描」。' + errNote(e);
       return;
     }
     $('loginBtn').disabled = false;
+    $('loginBtn').textContent = '開始掃描';
     if (r.error === 'pin') {
       store.clear();
       if (!fromSaved) $('loginErr').textContent = '密碼不正確。';
@@ -409,7 +413,7 @@
         retried = true;
         $('oTitle').textContent = '報到中…';
         $('oMeta').textContent = '連線較慢，重試中（' + n + '/' + CONFIG.TRIES + '）';
-      });
+      }, CONFIG.FAST_TIMEOUT_MS);
       // 重試後才回「已報到過」且時間在 2 分鐘內：是前一次請求其實已寫入，只是回應沒收到
       if (retried && r.result === 'dup' && isRecent(r.time)) {
         r = { result: 'ok', name: r.name, team: r.team, time: r.time, confirmed: true };

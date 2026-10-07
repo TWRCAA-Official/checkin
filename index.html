@@ -107,7 +107,7 @@
   const SITE = window.SITE_CONFIG;
   const $ = id => document.getElementById(id);
   const POLL_MS = Math.max(5, Number(SITE.POLL_SECONDS) || 5) * 1000;
-  const TIMEOUT_MS = 8000;
+  const TIMEOUT_MS = 20000;   // Apps Script 閒置後第一次呼叫要先喚醒，可能超過 8 秒
   const STORE = 'twpride_checkin_lookup';
   let current = null, timer = null;
 
