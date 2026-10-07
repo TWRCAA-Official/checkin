@@ -1,3 +1,6 @@
+// 只授權存取這份試算表，讀不到帳號裡的其他檔案（例如 Google 表單回覆）
+/** @OnlyCurrentDoc */
+
 /**
  * 臺灣同志遊行｜團體報到系統
  * 團體頁：GitHub Pages（https://twrcaa-official.github.io/checkin/）
