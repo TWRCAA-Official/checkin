@@ -124,7 +124,7 @@
     API_URL: 'https://script.google.com/a/macros/taiwanpride.lgbt/s/AKfycbzTg5AkU6ncqeVfDms1YcrKmoi9ua_BGdwR8tYmWsFn-WBXfwph0lg_HMM73UM7ePXL/exec',
     EVENT_NAME: '第 24 屆臺灣同志遊行',
     DEDUPE_MS: 4000,        // 同一個代碼多久內不重複送出
-    TIMEOUT_MS: 10000,      // 單次請求逾時；Google 偶爾會卡住不回，逾時後自動重試
+    TIMEOUT_MS: 6000,       // 單次請求逾時；正常 1–3 秒，Google 偶爾會卡住不回，逾時後自動重試
     TRIES: 3,               // 每個請求最多嘗試幾次
     STATS_SECONDS: 30,
   };
@@ -378,7 +378,7 @@
     o.hidden = false;
     clearTimeout(hideTimer);
     // 連線失敗時不自動關閉，避免這筆報到被默默略過
-    if (!retry) hideTimer = setTimeout(dismiss, r.result === 'ok' ? 2200 : 4000);
+    if (!retry) hideTimer = setTimeout(dismiss, r.result === 'ok' ? 1200 : 3000);
   }
 
   function dismiss() {
