@@ -69,6 +69,7 @@ function onOpen() {
 function onEdit() { clearCache(); }
 
 function setupSheet() {
+  if (!fromMenu_()) return;
   const ss = SpreadsheetApp.getActive();
   let sh = ss.getSheetByName(CONFIG.SHEET_NAME);
   if (!sh) sh = ss.insertSheet(CONFIG.SHEET_NAME);
@@ -80,6 +81,7 @@ function setupSheet() {
 }
 
 function generateCodes() {
+  if (!fromMenu_()) return;
   const sh = sheet_();
   const last = sh.getLastRow();
   if (last < 2) return;
@@ -102,6 +104,7 @@ function generateCodes() {
 }
 
 function setStaffPin() {
+  if (!fromMenu_()) return;
   const ui = SpreadsheetApp.getUi();
   const res = ui.prompt('設定工作人員密碼', '掃描頁登入時使用，建議 6 碼以上數字。', ui.ButtonSet.OK_CANCEL);
   if (res.getSelectedButton() !== ui.Button.OK) return;
@@ -112,6 +115,11 @@ function setStaffPin() {
 }
 
 function clearCache() { CacheService.getScriptCache().remove(CACHE_KEY); }
+
+// 管理功能只能從試算表選單執行；從網頁（google.script.run）呼叫時沒有試算表 UI，直接略過
+function fromMenu_() {
+  try { SpreadsheetApp.getUi(); return true; } catch (err) { return false; }
+}
 
 /* ---------- 團體頁 API ---------- */
 
