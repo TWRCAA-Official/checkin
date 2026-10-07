@@ -149,11 +149,13 @@
   }
 
   /* ---------- Apps Script API ---------- */
-  async function api(action, data) {
+  // 失敗時丟出的 Error 帶有 detail（例如 HTTP 404、逾時），會顯示在錯誤訊息後方方便回報
+  async function apiOnce(action, data) {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), CONFIG.TIMEOUT_MS);
+    let res, text;
     try {
-      const res = await fetch(CONFIG.API_URL, {
+      res = await fetch(CONFIG.API_URL, {
         method: 'POST',
         // text/plain 不會觸發 CORS 預檢
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -161,12 +163,31 @@
         redirect: 'follow',
         signal: ctrl.signal,
       });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return await res.json();
+      text = await res.text();
+    } catch (e) {
+      throw apiError(e && e.name === 'AbortError' ? '逾時' : '網路 ' + ((e && e.message) || e));
     } finally {
       clearTimeout(t);
     }
+    if (!res.ok) throw apiError('HTTP ' + res.status);
+    try { return JSON.parse(text); } catch (e) { throw apiError('回應格式錯誤'); }
   }
+
+  function apiError(detail) { const e = new Error(detail); e.detail = detail; return e; }
+
+  // 只讀的動作（登入驗證、統計）失敗時自動重試；報到不自動重試，交給工作人員按「重送」
+  async function api(action, data) {
+    const tries = action === 'checkIn' ? 1 : 3;
+    for (let i = 1; ; i++) {
+      try { return await apiOnce(action, data); }
+      catch (e) {
+        if (i >= tries) throw e;
+        await new Promise(r => setTimeout(r, 800 * i));
+      }
+    }
+  }
+
+  function errNote(e) { return e && e.detail ? '（' + e.detail + '）' : ''; }
 
   /* ---------- 登入 ---------- */
   async function login(s, fromSaved) {
@@ -177,12 +198,12 @@
       r = await api('verifyPin', { pin: s.pin });
     } catch (e) {
       $('loginBtn').disabled = false;
-      $('loginErr').textContent = '連線失敗，請確認網路後再按一次「開始掃描」。';
+      $('loginErr').textContent = '連線失敗，請確認網路後再按一次「開始掃描」。' + errNote(e);
       return;
     }
     $('loginBtn').disabled = false;
     if (r.error) {
-      $('loginErr').textContent = '系統讀取失敗，請稍後再按一次「開始掃描」。';
+      $('loginErr').textContent = '系統讀取失敗，請稍後再按一次「開始掃描」。（' + (r.message || r.error) + '）';
       return;
     }
     if (!r.ok) {
@@ -280,9 +301,9 @@
     let r;
     try {
       r = await api('checkIn', { pin: session.pin, code: code, staff: session.staff });
-      if (r.error) r = { result: 'error', code: code };
+      if (r.error) r = { result: 'error', code: code, detail: r.message || r.error };
     } catch (e) {
-      r = { result: 'net', code: code };
+      r = { result: 'net', code: code, detail: e.detail || '' };
     }
     showResult(r);
   }
@@ -318,7 +339,8 @@
       title = r.result === 'net' ? '連線失敗' : '讀取失敗';
       name = r.code || '';
       meta = (r.result === 'net' ? '這筆報到還沒有送出成功，請確認網路後按「重送」。' : '系統忙碌，這筆報到還沒有完成，請按「重送」。')
-        + '若重送後顯示「已報到過」，代表上一次其實已成功。';
+        + '若重送後顯示「已報到過」，代表上一次其實已成功。'
+        + (r.detail ? '（' + r.detail + '）' : '');
       retry = true; retryCode = r.code || '';
       buzz([300, 100, 300]);
     } else {
