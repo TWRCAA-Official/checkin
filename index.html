@@ -124,7 +124,8 @@
     API_URL: 'https://script.google.com/a/macros/taiwanpride.lgbt/s/AKfycbzTg5AkU6ncqeVfDms1YcrKmoi9ua_BGdwR8tYmWsFn-WBXfwph0lg_HMM73UM7ePXL/exec',
     EVENT_NAME: '第 24 屆臺灣同志遊行',
     DEDUPE_MS: 4000,        // 同一個代碼多久內不重複送出
-    TIMEOUT_MS: 25000,      // 單次請求逾時（伺服器端鎖最多等 15 秒）
+    TIMEOUT_MS: 10000,      // 單次請求逾時；Google 偶爾會卡住不回，逾時後自動重試
+    TRIES: 3,               // 每個請求最多嘗試幾次
     STATS_SECONDS: 30,
   };
 
@@ -175,16 +176,25 @@
 
   function apiError(detail) { const e = new Error(detail); e.detail = detail; return e; }
 
-  // 只讀的動作（登入驗證、統計）失敗時自動重試；報到不自動重試，交給工作人員按「重送」
-  async function api(action, data) {
-    const tries = action === 'checkIn' ? 1 : 3;
+  // 失敗時自動重試。報到也可以重試：伺服器會擋下重複報到，回傳「已報到過」（見 send()）
+  async function api(action, data, onRetry) {
     for (let i = 1; ; i++) {
       try { return await apiOnce(action, data); }
       catch (e) {
-        if (i >= tries) throw e;
-        await new Promise(r => setTimeout(r, 800 * i));
+        if (i >= CONFIG.TRIES) throw e;
+        if (onRetry) onRetry(i + 1);
+        await new Promise(r => setTimeout(r, 500 * i));
       }
     }
+  }
+
+  // 報到時間（HH:mm，臺北時間）是否在 2 分鐘內
+  function isRecent(hhmm) {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || ''));
+    if (!m) return false;
+    const now = new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Taipei', hour12: false }).split(':');
+    const diff = ((+now[0] * 60 + +now[1]) - (+m[1] * 60 + +m[2]) + 1440) % 1440;
+    return diff <= 2;
   }
 
   function errNote(e) { return e && e.detail ? '（' + e.detail + '）' : ''; }
@@ -296,11 +306,21 @@
     send(code);
   }
 
-  async function send(code) {
+  async function send(code, afterFailure) {
     showWait();
     let r;
     try {
-      r = await api('checkIn', { pin: session.pin, code: code, staff: session.staff });
+      let retried = !!afterFailure;
+      r = await api('checkIn', { pin: session.pin, code: code, staff: session.staff }, n => {
+        retried = true;
+        $('oTitle').textContent = '報到中…';
+        $('oMeta').textContent = '連線較慢，重試中（' + n + '/' + CONFIG.TRIES + '）';
+      });
+      // 重試後才回「已報到過」且時間在 2 分鐘內：是前一次請求其實已寫入，只是回應沒收到
+      if (retried && r.result === 'dup' && isRecent(r.time)) {
+        r = { result: 'ok', name: r.name, team: r.team, time: r.time, confirmed: true };
+        refreshStats();
+      }
       if (r.error) r = { result: 'error', code: code, detail: r.message || r.error };
     } catch (e) {
       r = { result: 'net', code: code, detail: e.detail || '' };
@@ -323,8 +343,10 @@
     o.className = '';
     let title = '', name = '', meta = '', team = r.team || '', retry = false;
     if (r.result === 'ok') {
-      o.classList.add('ok'); title = '✅ 報到完成'; name = r.name; meta = r.time + ' 報到　目前 ' + r.done + ' / ' + r.total;
-      setCount(r.done, r.total); buzz([120]);
+      o.classList.add('ok'); title = '✅ 報到完成'; name = r.name;
+      if (r.confirmed) { meta = r.time + ' 報到'; }
+      else { meta = r.time + ' 報到　目前 ' + r.done + ' / ' + r.total; setCount(r.done, r.total); }
+      buzz([120]);
     } else if (r.result === 'dup') {
       o.classList.add('dup'); title = '⚠️ 已報到過'; name = r.name; meta = r.time + ' 已完成報到';
       buzz([80, 80, 80]);
@@ -339,7 +361,7 @@
       title = r.result === 'net' ? '連線失敗' : '讀取失敗';
       name = r.code || '';
       meta = (r.result === 'net' ? '這筆報到還沒有送出成功，請確認網路後按「重送」。' : '系統忙碌，這筆報到還沒有完成，請按「重送」。')
-        + '若重送後顯示「已報到過」，代表上一次其實已成功。'
+
         + (r.detail ? '（' + r.detail + '）' : '');
       retry = true; retryCode = r.code || '';
       buzz([300, 100, 300]);
@@ -390,7 +412,7 @@
     if (c.contains('retry') || c.contains('wait')) return;
     dismiss();
   });
-  $('retryBtn').addEventListener('click', e => { e.stopPropagation(); if (retryCode) send(retryCode); else dismiss(); });
+  $('retryBtn').addEventListener('click', e => { e.stopPropagation(); if (retryCode) send(retryCode, true); else dismiss(); });
   $('skipBtn').addEventListener('click', e => { e.stopPropagation(); dismiss(); });
 
   $('loginBtn').addEventListener('click', () => {
