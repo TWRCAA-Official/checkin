@@ -1,6 +1,11 @@
 # 團體報到系統
 
-臺灣同志遊行團體報到用的網站，以 GitHub Pages 發布，資料存在 Google 試算表（透過 Apps Script API 讀寫）。
+臺灣同志遊行團體報到用的網站，以 GitHub Pages 發布，資料存在 Google 試算表。網頁透過 `config.js` 的 `API_URL` 讀寫試算表：
+
+- **Azure API**（`api/`）：Azure App Service 上的 Node 服務，用 Google Workload Identity Federation（免金鑰）讀寫試算表，速度穩定。設定見 [`docs/azure-setup.md`](docs/azure-setup.md)。
+- **Apps Script**（`apps-script/`）：原本的做法，保留當備援；試算表選單（產生代碼、設定密碼）也在這裡。
+
+兩者的請求與回應格式相同，切換只要改 `config.js` 的 `API_URL`。
 
 | 頁面 | 網址 | 給誰用 |
 |---|---|---|
@@ -11,7 +16,8 @@
 
 - `index.html`：團體頁。報到完成後畫面會自動變成「已完成報到」。
 - `scan/index.html`：掃描頁。登入時下載名單，掃到立刻顯示結果，寫入試算表在背景排隊進行（存在手機裡，斷線也不會遺失）。
-- `config.js`：兩頁共用的設定（Apps Script 網址、活動名稱）。
+- `config.js`：兩頁共用的設定（API 網址、活動名稱、報到截止時間）。
+- `api/`：Azure 上的 API（Node 24，沒有相依套件）。`npm test` 跑測試，`node dev/local.js` 用假資料在本機啟動。推上 `main` 由 `.github/workflows/deploy-api.yml` 自動部署。
 - `apps-script/`：試算表綁定的 Apps Script（`Code.gs`）。`Group.html`、`Scan.html` 是 Apps Script 版的團體頁與掃描頁，留作備援。
 
 工作人員密碼存在 Apps Script 的指令碼屬性（`STAFF_PIN`），不在這個 repo 裡。這個 repo 是公開的，請不要放任何報名資料。

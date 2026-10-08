@@ -1,0 +1,14 @@
+{
+  "name": "checkin-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "臺灣同志遊行團體報到 API：讀寫 Google 試算表，給 GitHub Pages 的團體頁與掃描頁呼叫",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  }
+}
