@@ -3,8 +3,8 @@
 
 /**
  * 臺灣同志遊行｜團體報到系統
- * 團體頁：GitHub Pages（https://twrcaa-official.github.io/checkin/）
- * 掃描頁：GitHub Pages（CONFIG.SCANNER_URL）
+ * 團體頁：https://event.taiwanpride.lgbt/2026/checkin/（程式在 TWRCAA-Official/event）
+ * 掃描頁：CONFIG.SCANNER_URL
  * 兩頁都透過 doPost JSON API 呼叫這裡
  * 備援：網頁應用程式網址（團體頁）、網頁應用程式網址 + ?page=scan（掃描頁）
  */
@@ -16,8 +16,8 @@ const CONFIG = {
   POLL_SECONDS: 5,        // 團體頁多久查詢一次報到狀態
   DONE_LABEL: '已報到',
   TZ: 'Asia/Taipei',
-  // GitHub Pages 掃描頁；QR Code 會指向「SCANNER_URL?code=團體代碼」。留空則改回 Apps Script 掃描頁。
-  SCANNER_URL: 'https://twrcaa-official.github.io/checkin/scan/',
+  // 掃描頁；QR Code 會指向「SCANNER_URL?code=團體代碼」。留空則改回 Apps Script 掃描頁。
+  SCANNER_URL: 'https://event.taiwanpride.lgbt/2026/checkin/scan/',
 };
 const COL = { CODE: 0, NAME: 1, EMAIL: 2, TEAM: 3, STATUS: 4, TIME: 5, STAFF: 6 };
 const CACHE_KEY = 'rows_v2';
