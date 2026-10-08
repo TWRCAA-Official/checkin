@@ -37,7 +37,7 @@ gcloud iam workload-identity-pools providers describe "$PROVIDER" --location=glo
     --attribute-mapping='google.subject=assertion.sub' \
     --attribute-condition="assertion.sub == '$MI_PRINCIPAL_ID'"
 
-echo '== 授權 Azure checkin-api 使用服務帳號'
+echo '== 授權 Azure twrcaa-checkin-api 使用服務帳號'
 gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
   --role='roles/iam.workloadIdentityUser' \
   --member="principal://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL/subject/$MI_PRINCIPAL_ID" \
