@@ -17,7 +17,7 @@ API 程式在 `api/`，部署流程在 `.github/workflows/deploy-api.yml`。
 event.taiwanpride.lgbt/2026/checkin（團體頁、掃描頁；程式在 TWRCAA-Official/event）
    │  POST JSON
    ▼
-Azure App Service checkin-api（Node 24，Always On）
+Azure App Service twrcaa-checkin-api（Node 24，Always On）
    │  Managed Identity 取得 Entra token
    ▼
 Google STS（Workload Identity Federation）→ 模擬服務帳號 checkin-sheets
@@ -33,7 +33,7 @@ Azure 入口網站 →「建立資源」→「Web 應用程式」：
 | 欄位 | 值 |
 |---|---|
 | 資源群組 | `內部系統` |
-| 名稱 | `checkin-api` |
+| 名稱 | `twrcaa-checkin-api`（Web App 名稱要全球唯一，`checkin-api` 已被別人使用） |
 | 發佈 | 程式碼 |
 | 執行階段堆疊 | Node 24 LTS |
 | 作業系統 | Linux |
@@ -94,7 +94,7 @@ Managed Identity 要「指定對象」才能取得 token，這個 app registrati
    az role assignment create \
      --assignee-object-id <DEPLOY_SP_OBJECT_ID> --assignee-principal-type ServicePrincipal \
      --role "Website Contributor" \
-     --scope "$(az webapp show --name checkin-api --resource-group 內部系統 --query id -o tsv)"
+     --scope "$(az webapp show --name twrcaa-checkin-api --resource-group 內部系統 --query id -o tsv)"
    ```
 
 4. **GitHub**：`TWRCAA-Official/checkin` → Settings → Environments → 新增 `production`（部署時的 OIDC 主體會帶這個名稱）。接著到 Settings → Secrets and variables → Actions → **Variables**（repo 層級）新增下列變數；這些都不是機密。還沒設定時，推上 main 只會跑測試、不會部署。
@@ -104,7 +104,7 @@ Managed Identity 要「指定對象」才能取得 token，這個 app registrati
    | `AZURE_CLIENT_ID` | `<DEPLOY_APP_ID>` |
    | `AZURE_TENANT_ID` | `dd841ca6-6d49-4e6e-997a-bf9b4813878d` |
    | `AZURE_SUBSCRIPTION_ID` | `b66057ec-8fa1-4990-9b38-56a86ada5e63` |
-   | `AZURE_WEBAPP_NAME` | `checkin-api` |
+   | `AZURE_WEBAPP_NAME` | `twrcaa-checkin-api` |
 
 ## 5. App Service 應用程式設定
 

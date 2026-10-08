@@ -4,7 +4,7 @@
 set -euo pipefail
 
 RG='內部系統'
-APP='checkin-api'
+APP="${APP:-twrcaa-checkin-api}"   # Web App 名稱要全球唯一；checkin-api 已被別人使用
 GOOGLE_SERVICE_ACCOUNT='請填：第 2 段印出的 GOOGLE_SERVICE_ACCOUNT'
 GOOGLE_WIF_AUDIENCE='請填：第 2 段印出的 GOOGLE_WIF_AUDIENCE'
 

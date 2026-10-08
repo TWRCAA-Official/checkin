@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # 第 1 段：Azure（在 Azure 入口網站右上角的 Cloud Shell「>_」選 Bash，整段貼上執行）
-# 建立 Web App checkin-api（放在現有的 ASP-Staging 方案）、開啟 Managed Identity，
+# 建立 Web App twrcaa-checkin-api（放在現有的 ASP-Staging 方案）、開啟 Managed Identity，
 # 以及兩個 Entra app registration（Google 驗證用、GitHub 部署用）。
 # 這裡沒有任何機密；跑完會印出第 2、3 段要用的值。
 set -euo pipefail
 
 RG='內部系統'
 PLAN='ASP-Staging'
-APP='checkin-api'
+APP="${APP:-twrcaa-checkin-api}"   # Web App 名稱要全球唯一；checkin-api 已被別人使用
 TENANT='dd841ca6-6d49-4e6e-997a-bf9b4813878d'
 SUBSCRIPTION='b66057ec-8fa1-4990-9b38-56a86ada5e63'
 GITHUB_SUBJECT='repo:TWRCAA-Official@261663519/checkin@1408825837:environment:production'

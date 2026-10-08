@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 第 2 段：Google Cloud（在 console.cloud.google.com 右上角的 Cloud Shell「>_」，先填好下面四個值再整段貼上）
 # 建立服務帳號 checkin-sheets（不建立金鑰）與 Workload Identity Federation，
-# 只允許 Azure 上的 checkin-api 以這個服務帳號身分存取試算表。
+# 只允許 Azure 上的 twrcaa-checkin-api 以這個服務帳號身分存取試算表。
 set -euo pipefail
 
 PROJECT_ID='請填：Google Cloud 專案 ID'            # 例如協會現有的專案，或新開的 twpride-checkin
@@ -24,11 +24,11 @@ gcloud services enable sheets.googleapis.com iamcredentials.googleapis.com sts.g
 
 echo '== 服務帳號（不建立金鑰）'
 gcloud iam service-accounts describe "$SA_EMAIL" >/dev/null 2>&1 || \
-  gcloud iam service-accounts create "$SA_NAME" --display-name='團體報到 API（Azure checkin-api 使用）'
+  gcloud iam service-accounts create "$SA_NAME" --display-name='團體報到 API（Azure twrcaa-checkin-api 使用）'
 
 echo '== Workload Identity 集區與提供者'
 gcloud iam workload-identity-pools describe "$POOL" --location=global >/dev/null 2>&1 || \
-  gcloud iam workload-identity-pools create "$POOL" --location=global --display-name='Azure checkin-api'
+  gcloud iam workload-identity-pools create "$POOL" --location=global --display-name='Azure twrcaa-checkin-api'
 gcloud iam workload-identity-pools providers describe "$PROVIDER" --location=global --workload-identity-pool="$POOL" >/dev/null 2>&1 || \
   gcloud iam workload-identity-pools providers create-oidc "$PROVIDER" \
     --location=global --workload-identity-pool="$POOL" \
