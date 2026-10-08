@@ -20,7 +20,7 @@
 - `api/`：Azure 上的 API（Node 24，沒有相依套件）。`npm test` 跑測試，`node dev/local.js` 用假資料在本機啟動。推上 `main` 由 `.github/workflows/deploy-api.yml` 自動部署。
 - `apps-script/`：試算表綁定的 Apps Script（`Code.gs`）。`Group.html`、`Scan.html` 是 Apps Script 版的團體頁與掃描頁，留作備援。
 
-工作人員密碼存在 Apps Script 的指令碼屬性（`STAFF_PIN`），不在這個 repo 裡。這個 repo 是公開的，請不要放任何報名資料。
+工作人員密碼存在 Azure App Service 的應用程式設定與 Apps Script 的指令碼屬性（都叫 `STAFF_PIN`，兩邊要設成一樣），不在這個 repo 裡。這個 repo 是公開的，請不要放任何報名資料。
 
 ## 試算表
 
