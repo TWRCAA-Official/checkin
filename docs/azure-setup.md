@@ -1,6 +1,15 @@
 # 報到 API 設定步驟（Azure App Service ＋ Google 免金鑰）
 
-API 程式在 `api/`，部署流程在 `.github/workflows/deploy-api.yml`。照下面順序做，每一步做完把「記下」的值填進最後的表格。
+API 程式在 `api/`，部署流程在 `.github/workflows/deploy-api.yml`。
+
+**快速做法**：`docs/setup/` 有三段腳本，在 Azure 與 Google 的 Cloud Shell 依序貼上執行，就完成下面第 1～5 步（除了「把試算表分享給服務帳號」要手動）：
+
+1. `1-azure.sh`：Azure Cloud Shell（Bash）。建立 Web App、Managed Identity、兩個 app registration，印出後面要用的值。**只跑一次**，重跑會重複建立 app registration。
+2. `2-google.sh`：Google Cloud Shell。先填好開頭的值（專案 ID 與第 1 段印出的值）。
+3. 手動把報到試算表分享給第 2 段印出的服務帳號（編輯者）。
+4. `3-azure-settings.sh`：回 Azure Cloud Shell，填好第 2 段印出的值；最後會請你輸入工作人員密碼。
+
+下面是每一步在入口網站的手動做法與說明，腳本出錯時可以對照。每一步做完把「記下」的值填進最後的表格。
 
 整體架構：
 
