@@ -143,14 +143,19 @@ Web App → 設定 → 環境變數 → 應用程式設定：
 
 ## 記錄用表格
 
+2026-10-08 建立（`docs/setup/` 三段腳本）：
+
 | 名稱 | 值 |
 |---|---|
-| `MI_PRINCIPAL_ID` | |
-| `WIF_APP_ID` | |
-| `GCP_PROJECT_ID` | |
-| `GCP_PROJECT_NUMBER` | |
-| `DEPLOY_APP_ID` | |
-| `DEPLOY_SP_OBJECT_ID` | |
-| App Service 預設網址 | |
+| Web App | `twrcaa-checkin-api`（資源群組 `內部系統`，方案 `ASP-Staging`） |
+| App Service 預設網址 | `https://twrcaa-checkin-api.azurewebsites.net/` |
+| `MI_PRINCIPAL_ID` | `054648a7-26f8-4787-93e1-4fd3463ea729` |
+| `WIF_APP_ID`（`checkin-google-wif`） | `2ced77ae-2d87-4cfc-a6c5-6675c84a2cec` |
+| `DEPLOY_APP_ID`（`github-checkin-deploy`） | `8784b92f-bb01-4d5d-bfb2-65fc6e2b45ce` |
+| `DEPLOY_SP_OBJECT_ID` | `7db0db80-e6c9-48c0-bf09-869a498e8afc` |
+| `GCP_PROJECT_ID` | `twpride-checkin`（無組織） |
+| `GCP_PROJECT_NUMBER` | `161989782461` |
+| 服務帳號 | `checkin-sheets@twpride-checkin.iam.gserviceaccount.com`（沒有金鑰） |
+| Workload Identity | 集區 `azure-checkin`、提供者 `azure-checkin` |
 
-這些都不是機密，完成後請記到 infra repo 的 `docs/resources.md`。
+這些都不是機密，也記到 infra repo 的 `docs/resources.md`。
