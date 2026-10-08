@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# 第 2 段：Google Cloud（在 console.cloud.google.com 右上角的 Cloud Shell「>_」，先填好下面四個值再整段貼上）
+# 第 2 段：Google Cloud（在 console.cloud.google.com 右上角的 Cloud Shell「>_」執行）
+# 用法：PROJECT_ID=… MI_PRINCIPAL_ID=… WIF_APP_ID=… bash 2-google.sh（或直接改下面的預設值）
 # 建立服務帳號 checkin-sheets（不建立金鑰）與 Workload Identity Federation，
 # 只允許 Azure 上的 twrcaa-checkin-api 以這個服務帳號身分存取試算表。
 set -euo pipefail
 
-PROJECT_ID='請填：Google Cloud 專案 ID'            # 例如協會現有的專案，或新開的 twpride-checkin
-MI_PRINCIPAL_ID='請填：第 1 段印出的 MI_PRINCIPAL_ID'
-WIF_APP_ID='請填：第 1 段印出的 WIF_APP_ID'
+PROJECT_ID="${PROJECT_ID:-請填：Google Cloud 專案 ID}"            # 例如協會現有的專案，或新開的 twpride-checkin
+MI_PRINCIPAL_ID="${MI_PRINCIPAL_ID:-請填：第 1 段印出的 MI_PRINCIPAL_ID}"
+WIF_APP_ID="${WIF_APP_ID:-請填：第 1 段印出的 WIF_APP_ID}"
 TENANT='dd841ca6-6d49-4e6e-997a-bf9b4813878d'
 
 POOL='azure-checkin'

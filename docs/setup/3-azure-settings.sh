@@ -5,8 +5,8 @@ set -euo pipefail
 
 RG='內部系統'
 APP="${APP:-twrcaa-checkin-api}"   # Web App 名稱要全球唯一；checkin-api 已被別人使用
-GOOGLE_SERVICE_ACCOUNT='請填：第 2 段印出的 GOOGLE_SERVICE_ACCOUNT'
-GOOGLE_WIF_AUDIENCE='請填：第 2 段印出的 GOOGLE_WIF_AUDIENCE'
+GOOGLE_SERVICE_ACCOUNT="${GOOGLE_SERVICE_ACCOUNT:-請填：第 2 段印出的 GOOGLE_SERVICE_ACCOUNT}"
+GOOGLE_WIF_AUDIENCE="${GOOGLE_WIF_AUDIENCE:-請填：第 2 段印出的 GOOGLE_WIF_AUDIENCE}"
 
 case "$GOOGLE_SERVICE_ACCOUNT$GOOGLE_WIF_AUDIENCE" in *請填*) echo '請先填好開頭的值' >&2; exit 1;; esac
 
