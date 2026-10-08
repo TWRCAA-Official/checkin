@@ -21,10 +21,10 @@ export const config = {
   staffPin: env.STAFF_PIN || '',
 
   // QR Code 內容：SCANNER_URL?code=團體代碼
-  scannerUrl: env.SCANNER_URL || 'https://twrcaa-official.github.io/checkin/scan/',
+  scannerUrl: env.SCANNER_URL || 'https://event.taiwanpride.lgbt/2026/checkin/scan/',
 
   // 允許呼叫的網頁來源（CORS）
-  allowedOrigins: list(env.ALLOWED_ORIGINS || 'https://twrcaa-official.github.io'),
+  allowedOrigins: list(env.ALLOWED_ORIGINS || 'https://event.taiwanpride.lgbt'),
 
   // Google 驗證：Azure Managed Identity → Workload Identity Federation → 服務帳號
   google: {

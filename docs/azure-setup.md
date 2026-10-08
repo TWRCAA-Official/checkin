@@ -5,7 +5,7 @@ API 程式在 `api/`，部署流程在 `.github/workflows/deploy-api.yml`。照�
 整體架構：
 
 ```
-GitHub Pages（團體頁、掃描頁）
+event.taiwanpride.lgbt/2026/checkin（團體頁、掃描頁；程式在 TWRCAA-Official/event）
    │  POST JSON
    ▼
 Azure App Service checkin-api（Node 24，Always On）
@@ -108,8 +108,8 @@ Web App → 設定 → 環境變數 → 應用程式設定：
 | `AZURE_TOKEN_RESOURCE` | `api://<WIF_APP_ID>` |
 | `GOOGLE_WIF_AUDIENCE` | `//iam.googleapis.com/projects/<GCP_PROJECT_NUMBER>/locations/global/workloadIdentityPools/azure-checkin/providers/azure-checkin` |
 | `GOOGLE_SERVICE_ACCOUNT` | `checkin-sheets@<GCP_PROJECT_ID>.iam.gserviceaccount.com` |
-| `ALLOWED_ORIGINS` | `https://twrcaa-official.github.io` |
-| `SCANNER_URL` | `https://twrcaa-official.github.io/checkin/scan/` |
+| `ALLOWED_ORIGINS` | `https://event.taiwanpride.lgbt`（多個用逗號分隔；event 的 PR 預覽網址要測 API 時可暫時加上） |
+| `SCANNER_URL` | `https://event.taiwanpride.lgbt/2026/checkin/scan/` |
 | `SCM_DO_BUILD_DURING_DEPLOYMENT` | `false`（沒有相依套件，不需要建置） |
 
 ## 6. 部署與驗證
@@ -130,7 +130,7 @@ Web App → 設定 → 環境變數 → 應用程式設定：
 
 ## 8. 切換網站
 
-把 `config.js` 的 `API_URL` 改成新網址（自訂網域或預設網址，結尾加 `/`），推上 main。Apps Script 繼續保留：試算表選單（產生代碼、設定密碼）照用，Apps Script 版頁面當備援。若要切回 Apps Script，只要把 `API_URL` 改回原本的網址。
+把 `TWRCAA-Official/event` 的 `2026/checkin/config.js` 裡 `API_URL` 改成新網址（自訂網域或預設網址，結尾加 `/`），推上 main。Apps Script 繼續保留：試算表選單（產生代碼、設定密碼）照用，Apps Script 版頁面當備援。若要切回 Apps Script，只要把 `API_URL` 改回原本的網址。
 
 ## 記錄用表格
 
