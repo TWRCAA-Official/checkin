@@ -56,7 +56,7 @@ export function createServer({ service, allowedOrigins }) {
 // 直接執行時才啟動（測試會自己組裝）
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const tokenProvider = createTokenProvider(config.google);
-  const store = createSheetStore({ spreadsheetId: config.spreadsheetId, sheetName: config.sheetName, tokenProvider });
+  const store = createSheetStore({ spreadsheetId: config.spreadsheetId, tokenProvider });
   const service = createService({ store, config });
   createServer({ service, allowedOrigins: config.allowedOrigins }).listen(config.port, () => {
     console.log(`[checkin-api] listening on ${config.port}`);

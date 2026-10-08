@@ -1,10 +1,10 @@
-// 用 Google Sheets API 讀寫「報到名單」分頁。
-// 讀取用 UNFORMATTED_VALUE + SERIAL_NUMBER（日期時間是序號）；寫入用 RAW（經手人名字不會被當成公式）。
+// 用 Google Sheets API 讀寫報到分頁（報到名單、花車報到、市集報到）。
+// 讀取用 UNFORMATTED_VALUE + SERIAL_NUMBER（日期時間是序號）；寫入用 RAW（經手人名字、備註不會被當成公式）。
 
 const API = 'https://sheets.googleapis.com/v4/spreadsheets';
+const LAST_COL = 'L';
 
-export function createSheetStore({ spreadsheetId, sheetName, tokenProvider }) {
-  const quoted = `'${sheetName.replace(/'/g, "''")}'`;
+export function createSheetStore({ spreadsheetId, tokenProvider }) {
   let timeZone = null;
 
   async function call(path, init = {}, attempt = 1) {
@@ -25,8 +25,8 @@ export function createSheetStore({ spreadsheetId, sheetName, tokenProvider }) {
     return text ? JSON.parse(text) : {};
   }
 
-  const range = a1 => '/values/' + encodeURIComponent(`${quoted}!${a1}`);
-  const READ = '?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=SERIAL_NUMBER';
+  const a1 = (sheet, cells) => `'${sheet.replace(/'/g, "''")}'!${cells}`;
+  const READ = 'valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=SERIAL_NUMBER';
 
   return {
     async timeZone() {
@@ -36,17 +36,26 @@ export function createSheetStore({ spreadsheetId, sheetName, tokenProvider }) {
       }
       return timeZone;
     },
-    async readAll() {
-      const json = await call(range('A2:G') + READ);
-      return json.values || [];
+    // 一次讀多個分頁的第 2 列以下：{ 分頁名稱: 列[] }。還沒建立的分頁當成空的
+    async readSheets(names) {
+      const meta = await call('?fields=sheets.properties.title');
+      const titles = new Set((meta.sheets || []).map(s => s.properties.title));
+      const present = names.filter(n => titles.has(n));
+      const out = Object.fromEntries(names.map(n => [n, []]));
+      if (!present.length) return out;
+      const ranges = present.map(n => 'ranges=' + encodeURIComponent(a1(n, `A2:${LAST_COL}`))).join('&');
+      const json = await call('/values:batchGet?' + ranges + '&' + READ);
+      (json.valueRanges || []).forEach((v, i) => { out[present[i]] = v.values || []; });
+      return out;
     },
-    async readRow(row) {
-      const json = await call(range(`A${row}:G${row}`) + READ);
+    async readRow(sheet, row) {
+      const json = await call('/values/' + encodeURIComponent(a1(sheet, `A${row}:${LAST_COL}${row}`)) + '?' + READ);
       return (json.values && json.values[0]) || [];
     },
-    // 寫入 E～G：報到狀態、報到時間（序號）、經手人
-    async writeCheckIn(row, values) {
-      await call(range(`E${row}:G${row}`) + '?valueInputOption=RAW', {
+    // 從第 col 欄（0 起算）開始寫入一列
+    async writeCells(sheet, row, col, values) {
+      const from = String.fromCharCode(65 + col), to = String.fromCharCode(65 + col + values.length - 1);
+      await call('/values/' + encodeURIComponent(a1(sheet, `${from}${row}:${to}${row}`)) + '?valueInputOption=RAW', {
         method: 'PUT',
         body: JSON.stringify({ majorDimension: 'ROWS', values: [values] }),
       });

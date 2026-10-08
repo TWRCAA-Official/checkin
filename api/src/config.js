@@ -11,8 +11,14 @@ export const config = {
 
   // 試算表
   spreadsheetId: env.SPREADSHEET_ID || '',
-  sheetName: env.SHEET_NAME || '報到名單',
+  // 三種報到各一個分頁，代碼前綴分別是 G-、F-、M-（由 Apps Script 選單產生）
+  sheets: {
+    team: env.SHEET_NAME || '報到名單',
+    float: env.FLOAT_SHEET_NAME || '花車報到',
+    market: env.MARKET_SHEET_NAME || '市集報到',
+  },
   doneLabel: env.DONE_LABEL || '已報到',
+  outLabel: env.OUT_LABEL || '已簽退',
   timeZone: env.TIME_ZONE || 'Asia/Taipei',
   // 名單在記憶體快取多久（秒）。直接在試算表手動修改的內容，最晚這麼久之後生效
   cacheSeconds: Number(env.CACHE_SECONDS) || 15,
@@ -38,5 +44,11 @@ export const config = {
   },
 };
 
-export const COLUMNS = ['團體代碼', '團體名稱', '報名Email', '大隊', '報到狀態', '報到時間', '經手人'];
-export const COL = { CODE: 0, NAME: 1, EMAIL: 2, TEAM: 3, STATUS: 4, TIME: 5, STAFF: 6 };
+export const KINDS = ['team', 'float', 'market'];
+// A～G 三個分頁相同（市集的 D 欄是攤位編號）；H～L 只有市集用來記錄簽退
+export const COL = {
+  CODE: 0, NAME: 1, EMAIL: 2, TEAM: 3, STATUS: 4, TIME: 5, STAFF: 6,
+  OUT_STATUS: 7, OUT_TIME: 8, OUT_STAFF: 9, CONDITION: 10, NOTE: 11,
+};
+// 簽退時的場地狀況
+export const CONDITIONS = { clear: '淨空無毀損', issue: '特殊事項' };
