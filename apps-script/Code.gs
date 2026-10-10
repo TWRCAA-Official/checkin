@@ -9,9 +9,10 @@
  * 備援：網頁應用程式網址（團體頁）、網頁應用程式網址 + ?page=scan（掃描頁）
  */
 
-// 隊伍、花車、彩虹市集各一個分頁，代碼前綴不同，三個分頁之間不重複；市集多了 H～L 欄記錄簽退
+// 隊伍、花車、彩虹市集各一個分頁，代碼前綴不同，三個分頁之間不重複；
+// 隊伍的 H 欄是隊伍人數（報到時發手冊用），市集的 H～L 欄記錄簽退
 const KINDS = {
-  team:   { sheet: '報到名單', prefix: 'G-', headers: ['團體代碼', '團體名稱', '報名Email', '大隊', '報到狀態', '報到時間', '經手人'] },
+  team:   { sheet: '報到名單', prefix: 'G-', headers: ['團體代碼', '團體名稱', '報名Email', '大隊', '報到狀態', '報到時間', '經手人', '隊伍人數'] },
   float:  { sheet: '花車報到', prefix: 'F-', headers: ['花車代碼', '團體名稱', '報名Email', '大隊', '報到狀態', '報到時間', '經手人'] },
   market: { sheet: '市集報到', prefix: 'M-', headers: ['攤位代碼', '攤商名稱', '報名Email', '攤位編號', '報到狀態', '報到時間', '經手人', '簽退狀態', '簽退時間', '簽退經手人', '場地狀況', '備註'] },
 };
@@ -29,6 +30,7 @@ const CONFIG = {
 };
 const COL = {
   CODE: 0, NAME: 1, EMAIL: 2, TEAM: 3, STATUS: 4, TIME: 5, STAFF: 6,
+  PEOPLE: 7,
   OUT_STATUS: 7, OUT_TIME: 8, OUT_STAFF: 9, CONDITION: 10, NOTE: 11,
 };
 const NCOL = 12;
@@ -201,6 +203,7 @@ function getRoster(pin) {
     rows: loadRows_().map(r => {
       const g = { code: r.code, kind: r.kind, name: r.name, team: r.team, done: r.done, time: r.time };
       if (r.kind === 'market') { g.out = r.out; g.outTime = r.outTime; g.condition = r.condition; }
+      if (r.kind === 'team') g.people = r.people;
       return g;
     }),
   };
@@ -219,7 +222,9 @@ function checkIn(pin, raw, staff) {
     const hit = f.hit, rowVals = f.vals;
 
     if (String(rowVals[COL.STATUS]).trim() === CONFIG.DONE_LABEL) {
-      return { result: 'dup', kind: hit.kind, name: hit.name, team: hit.team, time: fmtTime_(rowVals[COL.TIME]) };
+      const dup = { result: 'dup', kind: hit.kind, name: hit.name, team: hit.team, time: fmtTime_(rowVals[COL.TIME]) };
+      if (hit.kind === 'team') dup.people = hit.people;
+      return dup;
     }
 
     const now = new Date();
@@ -229,7 +234,9 @@ function checkIn(pin, raw, staff) {
     // 用寫入前讀到的名單計算已報到數，不必整張表重讀一次
     hit.done = true;
     const t = tally_(f.rows, hit.kind, 'done');
-    return { result: 'ok', kind: hit.kind, name: hit.name, team: hit.team, time: fmtTime_(now), done: t.done, total: t.total };
+    const ok = { result: 'ok', kind: hit.kind, name: hit.name, team: hit.team, time: fmtTime_(now), done: t.done, total: t.total };
+    if (hit.kind === 'team') ok.people = hit.people;   // 隊伍人數，發手冊用
+    return ok;
   } finally {
     lock.releaseLock();
   }
@@ -332,6 +339,7 @@ function loadRows_() {
         g.outTime = fmtTime_(r[COL.OUT_TIME]);
         g.condition = String(r[COL.CONDITION]).trim();
       }
+      if (kind === 'team') g.people = String(r[COL.PEOPLE]).trim();
       if (g.code && g.name && !seen[g.code]) { seen[g.code] = true; rows.push(g); }
     });
   });

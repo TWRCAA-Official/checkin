@@ -45,9 +45,11 @@ export const config = {
 };
 
 export const KINDS = ['team', 'float', 'market'];
-// A～G 三個分頁相同（市集的 D 欄是攤位編號）；H～L 只有市集用來記錄簽退
+// A～G 三個分頁相同（市集的 D 欄是攤位編號）。H 欄：隊伍是「隊伍人數」（報到時發手冊用）；
+// 市集的 H～L 記錄簽退
 export const COL = {
   CODE: 0, NAME: 1, EMAIL: 2, TEAM: 3, STATUS: 4, TIME: 5, STAFF: 6,
+  PEOPLE: 7,
   OUT_STATUS: 7, OUT_TIME: 8, OUT_STAFF: 9, CONDITION: 10, NOTE: 11,
 };
 // 簽退時的場地狀況

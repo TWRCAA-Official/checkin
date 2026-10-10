@@ -48,6 +48,7 @@ export function createService({ store, config, now = () => new Date() }) {
               time: fmtTime(r[COL.TIME], timeZone, config.timeZone),
             };
             if (kind === 'market') Object.assign(g, outFields(r, timeZone));
+            if (kind === 'team') g.people = cell(r, COL.PEOPLE);
             // 同一個代碼出現在兩個分頁時以先讀到的為準（代碼由選單產生，正常不會重複）
             if (g.code && g.name && !seen.has(g.code)) { seen.add(g.code); rows.push(g); }
           });
@@ -117,6 +118,9 @@ export function createService({ store, config, now = () => new Date() }) {
     return { data, hit, vals };
   }
 
+  // 隊伍的報到結果多帶人數（發手冊用）
+  function peopleOf(hit) { return hit.kind === 'team' ? { people: hit.people } : {}; }
+
   // 寫入後直接更新快取，團體頁輪詢馬上看得到（寫入期間若快取被重讀，新的那份也要更新）
   function patchCache(hit, fields) {
     Object.assign(hit, fields);
@@ -167,6 +171,7 @@ export function createService({ store, config, now = () => new Date() }) {
       rows: rows.map(r => {
         const g = { code: r.code, kind: r.kind, name: r.name, team: r.team, done: r.done, time: r.time };
         if (r.kind === 'market') Object.assign(g, { out: r.out, outTime: r.outTime, condition: r.condition });
+        if (r.kind === 'team') g.people = r.people;
         return g;
       }),
     };
@@ -184,14 +189,14 @@ export function createService({ store, config, now = () => new Date() }) {
       if (cell(vals, COL.STATUS) === config.doneLabel) {
         const time = fmtTime(vals[COL.TIME], data.timeZone, config.timeZone);
         patchCache(hit, { done: true, time });
-        return { result: 'dup', kind: hit.kind, name: hit.name, team: hit.team, time };
+        return { result: 'dup', kind: hit.kind, name: hit.name, team: hit.team, time, ...peopleOf(hit) };
       }
 
       const at = now();
       await store.writeCells(hit.sheet, hit.row, COL.STATUS, [config.doneLabel, dateToSerial(at, data.timeZone), String(staff ?? '')]);
       const time = fmtTime(at, data.timeZone, config.timeZone);
       patchCache(hit, { done: true, time });
-      return { result: 'ok', kind: hit.kind, name: hit.name, team: hit.team, time, ...tally(data.rows, hit.kind) };
+      return { result: 'ok', kind: hit.kind, name: hit.name, team: hit.team, time, ...peopleOf(hit), ...tally(data.rows, hit.kind) };
     });
   }
 

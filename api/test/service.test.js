@@ -35,8 +35,8 @@ const baseConfig = { staffPin: 'pw1234', doneLabel: '已報到', outLabel: '已�
 
 function setup(extra = {}) {
   const values = [
-    ['G-AAAAAA', '彩虹A團', 'a@x.org, b@x.org', '紅色'],
-    ['G-BBBBBB', '彩虹 B 團', 'B@X.org', '藍色', '已報到', dateToSerial(new Date('2026-10-31T05:05:00Z'), TZ), '阿明'],
+    ['G-AAAAAA', '彩虹A團', 'a@x.org, b@x.org', '紅色', '', '', '', 25],
+    ['G-BBBBBB', '彩虹 B 團', 'B@X.org', '藍色', '已報到', dateToSerial(new Date('2026-10-31T05:05:00Z'), TZ), '阿明', '約 40'],
     ['', '還沒有代碼的團體', 'c@x.org', ''],
     ['G-CCCCCC', '彩虹C團', 'c@x.org', '綠色'],
   ];
@@ -112,7 +112,11 @@ test('getRoster 不含 Email', async () => {
   const { service } = setup();
   const r = await service.handle({ action: 'getRoster', pin: 'pw1234' });
   assert.equal(r.rows.length, 7);
-  assert.deepEqual(Object.keys(r.rows[0]).sort(), ['code', 'done', 'kind', 'name', 'team', 'time']);
+  assert.deepEqual(Object.keys(r.rows[0]).sort(), ['code', 'done', 'kind', 'name', 'people', 'team', 'time']);
+  assert.equal(r.rows[0].people, '25');
+  assert.equal(r.rows[1].people, '約 40');
+  // 花車、市集不帶人數
+  assert.equal(r.rows.find(g => g.code === 'F-AAAAAA').people, undefined);
   const m = r.rows.find(g => g.code === 'M-CCCCCC');
   assert.deepEqual(m, { code: 'M-CCCCCC', kind: 'market', name: '已簽退的攤', team: 'C01', done: true, time: '10:00', out: true, outTime: '17:00', condition: '特殊事項' });
   assert.ok(!JSON.stringify(r).includes('@'));
@@ -121,7 +125,7 @@ test('getRoster 不含 Email', async () => {
 test('checkIn：成功寫入 E～G，接著重複報到回 dup', async () => {
   const { service, store, values } = setup();
   const ok = await service.handle({ action: 'checkIn', pin: 'pw1234', code: 'https://example.org/scan/?code=g-aaaaaa', staff: '小美' });
-  assert.deepEqual(ok, { result: 'ok', kind: 'team', name: '彩虹A團', team: '紅色', time: '12:30', done: 2, total: 3 });
+  assert.deepEqual(ok, { result: 'ok', kind: 'team', name: '彩虹A團', team: '紅色', time: '12:30', people: '25', done: 2, total: 3 });
   assert.equal(values[0][4], '已報到');
   assert.equal(fmtTime(values[0][5], TZ, TZ), '12:30');
   assert.equal(values[0][6], '小美');
@@ -130,7 +134,9 @@ test('checkIn：成功寫入 E～G，接著重複報到回 dup', async () => {
   assert.deepEqual(await service.handle({ action: 'getStatus', code: 'G-AAAAAA' }), { done: true, time: '12:30' });
   // 舊網址格式也認得
   const dup = await service.handle({ action: 'checkIn', pin: 'pw1234', code: 'https://script.google.com/x/exec?page=scan&code=G-AAAAAA', staff: '' });
-  assert.deepEqual(dup, { result: 'dup', kind: 'team', name: '彩虹A團', team: '紅色', time: '12:30' });
+  assert.deepEqual(dup, { result: 'dup', kind: 'team', name: '彩虹A團', team: '紅色', time: '12:30', people: '25' });
+  // 人數欄不會被報到寫入蓋掉
+  assert.equal(values[0][7], 25);
   assert.equal(store.writes.length, 1);
 });
 
@@ -147,7 +153,7 @@ test('checkIn：試算表在別處已經報到（快取還沒更新）也會回 
   await service.handle({ action: 'getStats', pin: 'pw1234' }); // 先讀進快取
   values[3][4] = '已報到'; values[3][5] = dateToSerial(new Date('2026-10-31T04:00:00Z'), TZ);
   const r = await service.handle({ action: 'checkIn', pin: 'pw1234', code: 'G-CCCCCC', staff: '小美' });
-  assert.deepEqual(r, { result: 'dup', kind: 'team', name: '彩虹C團', team: '綠色', time: '12:00' });
+  assert.deepEqual(r, { result: 'dup', kind: 'team', name: '彩虹C團', team: '綠色', time: '12:00', people: '' });
   assert.equal(store.writes.length, 0);
 });
 
